@@ -1,0 +1,2 @@
+# OTDM Labs
+Lab exercises for the [Optimization Techniques for Data Mining](https://www.fib.upc.edu/en/studies/masters/master-innovation-and-research-informatics/curriculum/syllabus/OTDM-MIRI) course at the Polytechnic University of Catalonia (UPC),  master's degree program in Information and Research in Informatics (MIRI), A.Y. 2021/2022, prof. Jordi Castro, Cristina Corchero and F. Javier Heredia. 

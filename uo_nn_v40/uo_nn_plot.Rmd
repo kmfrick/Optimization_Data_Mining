@@ -1,0 +1,85 @@
+---
+title: "Pattern recognition with Single Layer Neural Network"
+author: "Pol Barrachina, Kevin Michael Frick"
+output: html_document
+---
+
+```{r, echo=FALSE}
+report <- read.csv('uo_nn_batch_123456-789101.csv', sep=";", header=TRUE)
+report$isd <- factor(report$isd)
+report$num_target <- factor(report$num_target)
+report$la <- factor(report$la)
+levels(report$isd) <- c("GM", "QNM", "SGM")
+plot.aggr.data <- function(report, param, aggr, xlabel, ylabel, plot.title) {
+  aggr.data <- aggregate(as.formula(paste(aggr, " ~ ", param)), report, FUN = mean)
+  barplot(aggr.data[[aggr]], 
+          names.arg=levels(report[[param]]), 
+          main = plot.title, 
+          xlab=xlabel, ylab = ylabel, 
+          col= 10:15)
+}
+
+```
+
+# Single Layer Neural Network
+
+This first part consists on finding an optimal vector that minimizes the loss function. The loss function is constructed using the training set and computes the error between the $y$ function and its expected output.
+
+We applied the GM, CGM and QNM to find a vector $w$ that minimizes the loss function, thus improving our model $y$.
+
+We used parameters `tr_seed = 123456; te_seed = 789101; sg_seed = 565544`.
+
+# Computational study
+
+## Global convergence
+
+The loss function that we are optimizing is convex, for this reason we are able to reach the global optimum using GM, QNM and SGM. All of them identify a stationary solution for the loss function.
+
+## Regularization
+We plot the number of iterations and the mean time per iteration against the value of the regularization parameter $\lambda$. Relevant data has been aggregated with respect to all other variables, that is choice of method, training set accuracy and so on. 
+```{r aggr.lambda.niter, echo=FALSE}
+plot.aggr.data(report, "la", "niter", "Value of lambda", "Mean number of iterations", "Effects of regularization")
+```
+
+```{r aggr.lambda.tex, echo=FALSE}
+plot.aggr.data(report, "la", "tex", "Value of lambda", "Mean time per iteration", "Effects of regularization")
+```
+
+We can see that a regularization parameter $\lambda = 0.1$ gives the best results with respect to both number of iterations and mean time per iteration. 
+
+```{r aggr.lambda.loss, echo=FALSE}
+plot.aggr.data(report, "la", "L.", "Value of lambda", "Mean loss", "Effects of regularization")
+```
+
+```{r aggr.lambda.te_acc, echo=FALSE}
+plot.aggr.data(report, "la", "te_acc", "Value of lambda", "Mean test set accuracy", "Effects of regularization")
+```
+
+We also see, however, that the optimal regularization parameter with respect to speed, $\lambda = 0.1$, is the worst in terms of accuracy and mean value of the loss function. 
+
+## Gradient, quasi-newton and stochastic gradient methods
+
+We plot the number of iterations and the mean time per iteration against the optimization method chosen. 
+Relevant data has been aggregated with respect to all other variables, that is amount of regularization, training set accuracy and so on. 
+```{r aggr.isd.niter, echo=FALSE}
+plot.aggr.data(report, "isd", "niter", "Algorithm", "Mean number of iterations", "Algorithms in comparison")
+```
+
+```{r aggr.isd.tex, echo=FALSE}
+plot.aggr.data(report, "isd", "tex", "Algorithm", "Mean time per iteration", "Algorithms in comparison")
+```
+
+We can see that the stochastic gradient descent method is the fastest with respect to both the number of iterations required and mean time for iteration. 
+
+We now plot the mean loss and test set accuracy against the optimization method chosen. 
+
+```{r aggr.isd.loss, echo=FALSE}
+plot.aggr.data(report, "isd", "L.", "Algorithm", "Mean loss", "Algorithms in comparison")
+```
+
+```{r aggr.isd.te_acc, echo=FALSE}
+plot.aggr.data(report, "isd", "te_acc", "Algorithm", "Mean test set accuracy", "Algorithms in comparison")
+```
+
+We see that using SGD entails a trade-off between accuracy and performance. 
+As we can see, in fact, mean loss is higher and accuracy on the test set drops when using SGD. 
