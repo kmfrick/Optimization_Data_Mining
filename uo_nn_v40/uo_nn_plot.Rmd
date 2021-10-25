@@ -1,6 +1,7 @@
 ---
 title: "Pattern recognition with Single Layer Neural Network"
 author: "Pol Barrachina, Kevin Michael Frick"
+bibliography: uo_nn_plot.bib
 output: 
   pdf_document
 ---
@@ -87,8 +88,8 @@ We can see that a regularization parameter $\lambda = 0.1$ gives the best result
 The mean time per iteration, on the other hand, remains more or less the same, with the time for $\lambda \in \{0.01, 0.1\}$ being slightly faster.
 
 ```{r qnm.lambda.loss.te_acc, echo=FALSE, fig.show="hold", out.width="50%"}
-plot.aggr.data(filter(report, isd == "GM"), "la", "L.", "Value of lambda", "Mean loss", "Effects of regularization on QNM accuracy")
-plot.aggr.data(filter(report, isd == "GM"), "la", "te_acc", "Value of lambda", "Mean test set accuracy", "Effects of regularization on QNM accuracy")
+plot.aggr.data(filter(report, isd == "QNM"), "la", "L.", "Value of lambda", "Mean loss", "Effects of regularization on QNM accuracy")
+plot.aggr.data(filter(report, isd == "QNM"), "la", "te_acc", "Value of lambda", "Mean test set accuracy", "Effects of regularization on QNM accuracy")
 ```
 
 Again, the optimal regularization parameter with respect to speed, $\lambda = 0.1$, is the worst in terms of accuracy and mean value of the loss function, having the same effect on test set accuracy variance as with the GM.
@@ -167,8 +168,8 @@ plot.aggr.data(filter(report.big, isd == "QNM"), "la", "tex", "Value of lambda",
 The effects of regularization on the speed of QNM are much more pronounced in a bigger dataset. More regularization, in this case, monotonically leads to a much less variable number of iterations which is also lower, and each iteration is also slightly faster and the variance is reduced. 
 
 ```{r big.qnm.lambda.loss.te_acc, echo=FALSE, fig.show="hold", out.width="50%"}
-plot.aggr.data(filter(report.big, isd == "GM"), "la", "L.", "Value of lambda", "Mean loss", "Effects of regularization on QNM accuracy")
-plot.aggr.data(filter(report.big, isd == "GM"), "la", "te_acc", "Value of lambda", "Mean test set accuracy", "Effects of regularization on QNM accuracy")
+plot.aggr.data(filter(report.big, isd == "QNM"), "la", "L.", "Value of lambda", "Mean loss", "Effects of regularization on QNM accuracy")
+plot.aggr.data(filter(report.big, isd == "QNM"), "la", "te_acc", "Value of lambda", "Mean test set accuracy", "Effects of regularization on QNM accuracy")
 ```
 
 The effects on QNM accuracy are the same as before as well and match those observed on the GM, but more pronounced and more observable due to the size of the dataset. 
@@ -180,7 +181,8 @@ plot.aggr.data(filter(report.big, isd == "SGM"), "la", "tex", "Value of lambda",
 ```
 
 On a bigger dataset, regularization does not impact SGM speed significantly, neither in terms of number of iterations nor mean time per iteration. 
-The reason for this is the implicit regularization in the SGM renders explicit regularization redundant. 
+The reason for this is the implicit regularization in the SGM renders explicit regularization redundant.
+This has been observed in theoretical studies such as @li2018algorithmic.
 This effect is more easily observable in a case such as this, when the SGM has a significantly bigger sample to draw from, thus resulting in more extensive implicit "smoothing".
 
 ```{r big.sgm.lambda.loss.te_acc, echo=FALSE, fig.show="hold", out.width="50%"}
@@ -220,3 +222,5 @@ The QNM is much less sensitive to regularization, with the number of iterations 
 
 Finally, the stochastic gradient method is similar to the QNM in terms of speed while being less accurate on a smaller dataset. However, this method really shines on a bigger dataset, where it is much faster than the gradient method. Execution time is similar to the QNM, but accuracy is much higher and in the same ballpark as the gradient method. 
 Moreover, the SGD is totally insensitive to regularization on bigger datasets. As a matter of fact, explicit regularization only \emph{hurts} the SGD on a bigger dataset by reducing its accuracy while providing no benefits in terms of speed.
+
+# Bibliography
