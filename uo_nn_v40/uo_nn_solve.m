@@ -9,6 +9,7 @@ gL = @(w,Xds,yds) (2*sig(Xds)*((y(Xds,w)-yds).*y(Xds,w).* (1-y(Xds,w)))')/size(y
 L2 = @(w) L(w, Xtr, ytr);
 gL2 = @(w) gL(w, Xtr, ytr);
 
+
 [Xte, yte] = uo_nn_dataset(te_seed, te_q, num_target, tr_freq);
 
 w0 = ones(1, 35)' * 0;
@@ -17,10 +18,10 @@ t1 = clock;
 if isd < 7
 [wo, niter] = uo_solve(w0,L2,gL2,epsG,kmax,ialmax,c1,c2,isd,icg,irc,nu);
 else % sgd
-    [wo, niter] = uo_sgm(w0, la, L, gL, Xtr, ytr, Xte, yte, sg_al0, sg_be, sg_ga, sg_emax,sg_ebest)
+    [wo, niter] = uo_sgm(w0, la, L, gL, Xtr, ytr, Xte, yte, sg_al0, sg_be, sg_ga, sg_emax,sg_ebest);
 end
 t2 = clock; 
-tex= etime(t2, t1);
+tex= etime(t2, t1)/niter;
 wo = wo(:, end);
 fo = L2(wo);
 acc = @(Xds,yds,wo) 100*sum(yds==round(y(Xds,wo)))/size(Xds,2);
