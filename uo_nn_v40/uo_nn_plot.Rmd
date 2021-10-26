@@ -49,12 +49,14 @@ We used parameters `tr_seed = 123456; te_seed = 789101; sg_seed = 565544` for th
 
 # Computational study
 
-## Global convergence
+## Note on global convergence
 
 The loss function that we are optimizing is not convex, so using the gradient, quasi-Newton and stochastic gradient methods will imply convergence to a local minimum but not guarantee convergence to a global minimum.
-All of the methods tried, however, identify a stationary solution for the loss function that provides a weight vector $w$ which allow to perform the task at hand with sufficient accuracy.
+Therefore, global convergence is defined as convergence to a stationary point, i.e. stopping before $k_{max}$ iterations.
+All of the methods tried, except in one case, manage identify a stationary solution for the loss function that provides a weight vector $w$ which allows to perform the task at hand with sufficient accuracy.
+The one exception to this rule is the gradient method, which in many cases is not able to converge without adding regularization.
 
-### Gradient method
+## Gradient method
 
 We plot the number of iterations and the mean time per iteration against the value of the regularization parameter $\lambda$ when using the gradient method.
 
@@ -63,8 +65,10 @@ plot.aggr.data(filter(report, isd == "GM"), "la", "niter", "Value of lambda", "M
 plot.aggr.data(filter(report, isd == "GM"), "la", "tex", "Value of lambda", "Mean time per iteration", "Effects of regularization on GM speed")
 ```
 
-We can see that a regularization parameter $\lambda = 0.1$ gives the best results with respect to number of iterations, while dramatically increasing the variance on the execution time of a single iteration.
-This is to be expected as adding regularization requires computing the gradient for the regularization term as well as the loss function.
+We can see that a regularization parameter $\lambda = 0.1$ gives the best results with respect to number of iterations, while increasing the variance on the execution time of a single iteration.
+The increase in variance, however, is in the order of one millisecond, so the box plot is misleading in this case.
+
+We see that, without regularization, the gradient method usually stops only when reaching the maximum number of iterations, which means it's not converging in general.
 
 ```{r gm.lambda.loss.te_acc, echo=FALSE, fig.show="hold", out.width="50%"}
 plot.aggr.data(filter(report, isd == "GM"), "la", "L.", "Value of lambda", "Mean loss", "Effects of regularization on GM accuracy")
@@ -75,7 +79,7 @@ We also see, however, that the optimal regularization parameter with respect to 
 The variance in accuracy also increases by about five times.
 This is also to be expected since minimizing $\tilde{L}(\cdot)$ is not the same as minimizing $L(\cdot)$, so we are effectively trading off speed for accuracy.
 
-### Quasi-Newton method
+## Quasi-Newton method
 
 We plot the number of iterations and the mean time per iteration against the value of the regularization parameter $\lambda$ when using a quasi-Newton method.
 
@@ -95,7 +99,7 @@ plot.aggr.data(filter(report, isd == "QNM"), "la", "te_acc", "Value of lambda", 
 Again, the optimal regularization parameter with respect to speed, $\lambda = 0.1$, is the worst in terms of accuracy and mean value of the loss function, having the same effect on test set accuracy variance as with the GM.
 
 
-### Stochastic gradient method
+## Stochastic gradient method
 
 We plot the number of iterations and the mean time per iteration against the value of the regularization parameter $\lambda$ when using the stochastic gradient method.
 
@@ -115,7 +119,7 @@ plot.aggr.data(filter(report, isd == "SGM"), "la", "te_acc", "Value of lambda", 
 We also see, however, that the optimal regularization parameter with respect to speed, $\lambda = 0.1$, is the worst in terms of accuracy and mean value of the loss function.
 This is also to be expected since minimizing $\tilde{L}(\cdot)$ is not the same as minimizing $L(\cdot)$.
 
-### Methods compared across regularization levels
+## Methods compared across regularization levels
 
 We now plot the summary statistics taken into account up until now in order to compare different descent methods.
 
