@@ -65,8 +65,7 @@ plot.aggr.data(filter(report, isd == "GM"), "la", "niter", "Value of lambda", "M
 plot.aggr.data(filter(report, isd == "GM"), "la", "tex", "Value of lambda", "Mean time per iteration", "Effects of regularization on GM speed")
 ```
 
-We can see that a regularization parameter $\lambda = 0.1$ gives the best results with respect to number of iterations, while increasing the variance on the execution time of a single iteration.
-The increase in variance, however, is in the order of one millisecond, so the box plot is misleading in this case.
+We can see that a regularization parameter $\lambda = 0.1$ gives the best results with respect to number of iterations, while having no effect on the mean execution time per iteration.
 
 We see that, without regularization, the gradient method usually stops only when reaching the maximum number of iterations, which means it's not converging in general.
 
@@ -108,16 +107,15 @@ plot.aggr.data(filter(report, isd == "SGM"), "la", "niter", "Value of lambda", "
 plot.aggr.data(filter(report, isd == "SGM"), "la", "tex", "Value of lambda", "Mean time per iteration", "Effects of regularization on SGM speed")
 ```
 
-We can see that a regularization parameter $\lambda = 0.1$ gives the best results with respect to number of iterations, while slowing down the execution time of a single iteration slightly.
-This is to be expected as adding regularization requires computing the gradient for the regularization term as well as the loss function.
+We can see that adding regularization does not influence the median number of epochs that the stochastic gradient method needs to converge, although the variance is greatly reduced by a small amount of regularization.
 
 ```{r sgm.lambda.loss.te_acc, echo=FALSE, fig.show="hold", out.width="50%"}
 plot.aggr.data(filter(report, isd == "SGM"), "la", "L.", "Value of lambda", "Mean loss", "Effects of regularization on SGM accuracy")
 plot.aggr.data(filter(report, isd == "SGM"), "la", "te_acc", "Value of lambda", "Mean test set accuracy", "Effects of regularization on SGM accuracy")
 ```
 
-We also see, however, that the optimal regularization parameter with respect to speed, $\lambda = 0.1$, is the worst in terms of accuracy and mean value of the loss function.
-This is also to be expected since minimizing $\tilde{L}(\cdot)$ is not the same as minimizing $L(\cdot)$.
+We also see, however, that adding regularization reduces average and median test set accuracy on average as well as, of course, increasing the value of the mean loss that is reached.
+In this sense, adding more than a small amount of regularization hurts the stochastic gradient method.
 
 ## Methods compared across regularization levels
 
@@ -127,17 +125,17 @@ We now plot the summary statistics taken into account up until now in order to c
 plot.aggr.data(filter(report, la == "0"), "isd", "niter", "Type of method", "Mean number of iterations", "Methods compared with no regularization")
 plot.aggr.data(filter(report, la == "0"), "isd", "tex", "Type of method", "Mean execution time per iteration", "Methods compared with no regularization")
 ```
-We can see that, in absence of regularization, the gradient method is the slowest in terms of number of iterations, followed by the quasi-Newton method and the stochastic gradient method, which is the one with the fewest iterations. As expected, the quasi-Newton method is the slowest in terms of mean time for a single iteration, while the gradient method is the fastest.
-The stochastic gradient method, due to the inherent randomness, is the one with highest variance and is faster per iteration than the quasi-Newton method, albeit with higher variance.
+We can see that, in absence of regularization, the gradient method is the slowest in terms of number of iterations, followed by the stochastic gradient method and the quasi-Newton method, which is the one with the fewest iterations. As expected, the quasi-Newton method is the slowest in terms of mean time for a single iteration, while the gradient method is the fastest.
+The stochastic gradient method, due to the inherent randomness, is the one with highest variance and is faster per iteration than the quasi-Newton method,.
 
-The charts showing number of iterations have to be taken with a grain of salt, since the number of "iterations" of the stochastic gradient method is taken to be the number of epochs since summing iterations across all epochs would result in a much bigger number. Either way, this is not an entirely "fair" comparison and is only intended to qualitively compare methods in a graphical way.
+The charts showing number of iterations have to be taken with a grain of salt, since the number of "iterations" of the stochastic gradient method is taken to be the number of epochs since summing iterations across all epochs would result in a much bigger number. Either way, this is not an entirely "fair" comparison and is only intended to qualitatively compare methods in a graphical way.
 
 ```{r algo.0.1reg.lambda.niter.tex, echo=FALSE, fig.show="hold", out.width="50%"}
 plot.aggr.data(filter(report, la == "0.01"), "isd", "niter", "Type of method", "Mean number of iterations", "Methods compared with lambda = 0.01")
 plot.aggr.data(filter(report, la == "0.01"), "isd", "tex", "Type of method", "Mean execution time per iteration", "Methods compared with lambda = 0.01")
 ```
 
-The difference in speed measured in terms of number of iteration becomes less dramatic when adding regularization, while the speed of a single iterations remains more or less consistent with what is found in the case of absence of regularization.
+The difference in speed measured in terms of number of iteration becomes less dramatic when adding regularization, while the speed of a single iteration remains more or less consistent with what is found in the case of absence of regularization.
 
 ```{r algo.0.01reg.lambda.niter.tex, echo=FALSE, fig.show="hold", out.width="50%"}
 plot.aggr.data(filter(report, la == "0.1"), "isd", "niter", "Type of method", "Mean number of iterations", "Methods compared with lambda = 0.1")
@@ -155,7 +153,7 @@ plot.aggr.data(filter(report, la == "0"), "isd", "L.", "Type of method", "Mean l
 plot.aggr.data(filter(report, la == "0"), "isd", "te_acc", "Type of method", "Mean test set accuracy", "Methods compared with no regularization")
 ```
 
-We can see that the accuracy, while being very high in all cases, is the highest with the stochastic gradient descent method, which however obtains a worse value for the loss functon.
+We can see that the accuracy, while being very high in all cases, is the highest with the stochastic gradient descent method, which however obtains a worse value for the loss function than the quasi-Newton method.
 This is to be expected since the stopping criterium for the SGD is not related to having reached a minimum for the loss function, so we are effectively not \emph{minimizing} the loss.
 
 ```{r algo.0.1reg.loss.te_acc, echo=FALSE, fig.show="hold", out.width="50%"}
@@ -215,7 +213,7 @@ plot.aggr.data(filter(report.big, isd == "SGM"), "la", "niter", "Value of lambda
 plot.aggr.data(filter(report.big, isd == "SGM"), "la", "tex", "Value of lambda", "Mean time per iteration", "Effects of regularization on SGM speed")
 ```
 
-The negative effect of explicit regularization on stochastic gradient descent is easily observable in a case such as this, when the stochastic gradient method has a significantly bigger sample to draw from, thus resulting in more extensive implicit "smoothing".
+The effect of explicit regularization on stochastic gradient descent is easily observable in a case such as this, when the stochastic gradient method has a significantly bigger sample to draw from, thus resulting in more extensive implicit "smoothing".
 
 ```{r big.sgm.lambda.loss.te_acc, echo=FALSE, fig.show="hold", out.width="50%"}
 plot.aggr.data(filter(report.big, isd == "SGM"), "la", "L.", "Value of lambda", "Mean loss", "Effects of regularization on SGM accuracy")
@@ -229,7 +227,7 @@ plot.aggr.data(filter(report.big, la == "0"), "isd", "niter", "Type of method", 
 plot.aggr.data(filter(report.big, la == "0"), "isd", "tex", "Type of method", "Mean execution time per iteration", "Methods compared with no regularization")
 ```
 
-On a bigger dataset the mean number of iterations is much more variable when using a quasi-Newton method, which is also the slowest per iteration as before. In any case, when observing median values, the trend is the same as what is observed on a smaller dataset.
+On a bigger dataset the execution time and number of iterations are much more variable when using a quasi-Newton method, which is also the slowest per iteration as before. In any case, when observing median values, the trend is the same as what is observed on a smaller dataset.
 
 ```{r big.algo.0.01reg.lambda.niter.tex, echo=FALSE, fig.show="hold", out.width="50%"}
 plot.aggr.data(filter(report.big, la == "0.01"), "isd", "niter", "Type of method", "Mean number of iterations", "Methods compared with lambda = 0.01")
@@ -261,6 +259,7 @@ plot.aggr.data(filter(report.big, la == "0.01"), "isd", "te_acc", "Type of metho
 ```
 
 Finally, we see that the behavior of different methods when adding regularization is very similar.
+
 One thing we notice is that the quasi-Newton method displays increased variance without regularization.
 We can also see that the quasi-Newton method is more precise than the other two methods in absence of regularization, albeit with increased variance, but this advantage almost disappears when regularization is introduced.
 
