@@ -1,0 +1,48 @@
+---
+title: "Optimization problems in support vector machines"
+author: "Pol Barrachina, Kevin Michael Frick"
+bibliography: lab2_svm.bib
+output:
+  pdf_document
+---
+
+# Support vector machines
+
+The assignment is concerned with the analysis of the optimization problems entailed by the usage of a support vector machine as a classification algorithm. 
+
+
+
+# Primal and dual SVMs 
+The primal formulation of the SVM is implemented in AMPL as follows. 
+```{r svmprimal, echo=FALSE, results="markup", comment=""}
+cat(readLines("SVM.mod"),sep="\n")
+```
+The dual, on the other hand, is implemented as follows. 
+```{r svmdual, echo=FALSE, results="markup", comment=""}
+cat(readLines("DualSVM.mod"),sep="\n")
+```
+
+We now run the primal and dual formulation of the SVM on the same dataset and ensure the primal and dual solutions are the same. 
+
+```{bash, engine.opts='-l', echo=FALSE}
+AMPL_PATH="/Applications/ampl_macos64"
+NUM_PARAM=4
+# Kevin's student ID number is 590162, used as the seed
+TR_SEED=590162
+TE_SEED=261069
+TRAIN_FNAME="train.dat"
+NU=0.5
+for m in 25 50 75; do 
+	# Generate training set
+	#./gensvmdat train_$m.dat $m ${TR_SEED}
+	cp train_$m.dat ${TRAIN_FNAME}
+	# Remove asterisks
+	sed -i ''  -e 's/\*//g'  ${TRAIN_FNAME}
+	export PATH=${PATH}:${AMPL_PATH}
+	echo "m = ${m}, nu = ${NU}, Primal SVM:"
+	printf "${NUM_PARAM}\n${m}\n${NU}" | ./SVM.run | tail -n ${NUM_PARAM}
+	echo "m = ${m}, nu = ${NU}, Dual SVM:"
+	printf "${NUM_PARAM}\n${m}\n${NU}" | ./DualSVM.run | tail -n ${NUM_PARAM}
+	#./gensvmdat test_$i.dat $i ${TE_SEED}
+done
+```

@@ -1,0 +1,26 @@
+#!/usr/bin/env ampl
+model DualSVM.mod;
+printf "Enter number of features n: ";
+read n <-;
+printf "Enter number of data points m: ";
+read m <-;
+
+for {i in 1..m} {
+	for {j in 1..n} {
+		read A[i, j] < train.dat;
+	}
+	read y[i] < train.dat;
+}
+
+option solver cplex;
+show;
+
+printf "Enter the parameter nu: ";
+read nu <-;
+expand;
+
+solve;
+for {j in 1..n} {
+	printf "w_%d = %lf\n", j, sum{i in 1..m} lambda[i] * y[i] * A[i, j]
+}
+

@@ -1,0 +1,94 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage[margin=2cm]{geometry}
+\usepackage[english]{babel}
+\author{Kevin Michael Frick}
+\title{OTDM - Optimality conditions homework}
+\begin{document}
+\maketitle
+Problem statement:
+
+\begin{equation*}
+\begin{cases}
+\min &(x_1 - 3)^2 + (x_2 - 2)^2  \\
+\textsc{s.t.} & x_1^2 + x_2^2 \leq 1
+\end{cases}
+\end{equation*}
+
+We first calculate the Lagrangian. In this case, the single inequality constraint is real-valued, so $\mu$ is a scalar.
+
+$$L(x, \mu) = (x_1 - 3)^2 + (x_2 - 2)^2 + \mu(x_1^2 + x_2^2 - 1)$$
+
+The gradient of the Lagrangian w.r.t. $\mathbf{x}$ is
+
+$$\nabla_x L = (2 x_1 + 2\mu x_1 - 6, 2x_2 + 2 \mu x_2 - 4)$$ 
+
+and its Hessian is
+
+$$\nabla^2_{xx} L = \begin{pmatrix} 2 + 2 \mu & 0 \\ 0 & 2 + 2 \mu\end{pmatrix}$$
+
+whose eigevalues are
+
+$$\lambda(\nabla^2_{xx} L) = \{2 + 2 \mu\}$$
+
+Imposing the KKT sufficient first- and second-order conditions we get
+
+\begin{equation*}
+\begin{cases}
+(1 + \mu) x_1 - 3 = 0 \\
+(1 + \mu) x_2 - 2 = 0 \\
+x_1^2 + x_2^2 \leq 1 \\
+\mu(x_1^2 + x_2^2 - 1) = 0 \\
+\mu \geq 0 \\
+2 + 2\mu > 0
+\end{cases}
+\end{equation*}
+
+The last equation evaluates to $\mu > -1$ which is redundant. 
+
+Solving the first and second equation leads to 
+\begin{equation*}
+\begin{cases}
+x_1 = \frac{3}{1 + \mu} \\
+x_2 = \frac{2}{1 + \mu} 
+\end{cases}
+\end{equation*}
+
+Which substituted into the complementary slackness condition gives
+
+$$
+\mu (\frac{9}{(1 + \mu)^2} + \frac{4}{(1 + \mu)^2} - 1) = 0
+$$
+
+If we assume $\mu = 0$ we get $x_1 = 3, x_1 = 2$ but then $x_1^2 + x_2^2 > 1$, so $\mu \neq 0$. 
+Therefore we can solve complementary slackness for $\mu$ and get
+
+$$13 = (1 + \mu)^2 \iff 1 + \mu = \pm \sqrt{13}$$
+
+but $\mu > 0$, so
+
+$$\mu = + \sqrt{13} - 1$$
+
+which backsubstituted gives
+
+\begin{equation*}
+\begin{cases}
+x_1 = \frac{3\sqrt{13}}{13} \\
+x_2 = \frac{2\sqrt{13}}{13} 
+\end{cases}
+\end{equation*}
+
+which verify $x_1^2 + x_2^2 \leq 1$ (in particular, $x_1^2 + x_2^2 = 1$, so the point is on the circumference). 
+
+Therefore the solution of the problem is 
+
+$$
+\mathbf{x} = \frac{\sqrt{13}}{13} (3, 2)
+$$
+
+This is, clearly, not a global minimum for the unconstrained $f(x_1, x_2) = (x_1 - 3)^2 + (x_2 - 2)^2$, as the global minimum is $(3, 2)$ where $f(3, 2) = 0$. 
+However, given the constraint, there is only one minimum which is the point we just found. 
+Since the point lies on the circumference, if the constraint had been an equality constraint the solution would have been the same. 
+
+\end{document}

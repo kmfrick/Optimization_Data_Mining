@@ -1,17 +1,17 @@
 function [w, e] = uo_sgm(wo, la, f, g, Xtr, ytr, Xte, yte, alpha, beta, gamma, esg_max, esg_best)
 p = size(Xtr, 2);
 m = floor(gamma * p);
-ksge = ceil(p / m);
+ksge = p / m;
 ksgmax = esg_max * ksge;
 e = 0;
 s = 0; 
-L_best = 99999;
+L_best = +inf;
 k = 0;
 wk = wo;
 w = wo;
 while e < esg_max && s < esg_best
     P = randperm(p);
-    for i = 1:(int32(ceil(p/m-1)))
+    for i = 0:p/m-1
         S = P(:, (i*m+1):min((i+1)*m, p));
         Xtrs = Xtr(:, S);
         ytrs = ytr(S);

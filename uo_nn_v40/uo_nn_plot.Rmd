@@ -37,6 +37,12 @@ plot.aggr.data <- function(dataset, param, aggr, xlabel, ylabel, plot.title) {
 
 ```
 
+Small dataset seeds: `tr_seed = 123456; te_seed = 789101; sg_seed = 565544`
+
+Large dataset seeds:`tr_seed = 50321; te_seed = 202103; sg_seed = 123456`
+
+\newpage
+
 # Single-Layer Neural Network
 
 The assignment is concerned with building a single-layer neural network that is able to recognize blurred digits, then using different descent methods to find the optimal vector of weights by minimizing a loss function with different amounts of regularization. The loss function is constructed using the training set and computes the error between the $y$ function and its expected output.
@@ -45,7 +51,7 @@ We applied the gradient method (GM), quasi-Newton Method (QNM) and stochastic gr
 
 We then carried out a computational study on both a smaller and a bigger dataset.
 
-We used parameters `tr_seed = 123456; te_seed = 789101; sg_seed = 565544` for the smaller dataset and `tr_seed = 50321; te_seed = 202103; sg_seed = 123456` for the bigger one.
+
 
 # Computational study
 
@@ -272,7 +278,7 @@ The gradient method is quite sensitive to regularization, with higher values of 
 
 The quasi-Newton method significantly reduces number of iterations and, thus, total computational time on both big and small datasets and identifies a solution that is just as accurate as the one found by the gradient method on a small dataset.
 When moving to big datasets, the quasi-Newton method is still much faster than the gradient method.
-The stochastic gradient method is much less sensitive to regularization, with the number of iterations remaining in the same order of magnitude across values of the regularization parameter.
+The quasi-Newton method is much less sensitive to regularization, with the number of iterations remaining in the same order of magnitude across values of the regularization parameter.
 
 Finally, the stochastic gradient method is similar to the quasi-Newton method in terms of speed while being less accurate on a smaller dataset. However, this method really shines on a bigger dataset, where it is much faster than the gradient method. Execution time is similar to the quasi-Newton method, but accuracy is much higher and in the same ballpark as the gradient method.
 Moreover, the SGD is totally insensitive to regularization on bigger datasets. As a matter of fact, explicit regularization only \emph{hurts} the SGD on a bigger dataset by reducing its accuracy while providing no benefits in terms of speed.
