@@ -13,11 +13,11 @@ for {i in 1..m} {
 }
 
 option solver cplex;
-show;
+# show;
 
 printf "Enter the parameter nu: ";
 read nu <-;
-expand;
+# expand;
 
 solve;
 for {j in 1..n} {
