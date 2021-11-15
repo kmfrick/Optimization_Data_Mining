@@ -14,6 +14,7 @@ The assignment is concerned with the analysis of the optimization problems entai
 
 # Primal and dual SVMs 
 The primal formulation of the SVM is implemented in AMPL as follows. 
+
 ```{r svmprimal, echo=FALSE, results="markup", comment=""}
 cat(readLines("SVM.mod"),sep="\n")
 ```
@@ -22,27 +23,179 @@ The dual, on the other hand, is implemented as follows.
 cat(readLines("DualSVM.mod"),sep="\n")
 ```
 
-We now run the primal and dual formulation of the SVM on the same dataset and ensure the primal and dual solutions are the same. 
+# Computational study
+
+## gensvmdat
+
+We now run the primal and dual formulation of the SVM on the same dataset, generated with the provided `gensvmdat` program, then retrieve the primal solution from the dual as$w_j = \sum_{i=1}^m \lambda_i y_i A_{ij}$.
+We will then check that the primal and dual solutions are the same.
 
 ```{bash, engine.opts='-l', echo=FALSE}
 AMPL_PATH="/Applications/ampl_macos64"
 NUM_PARAM=4
-# Kevin's student ID number is 590162, used as the seed
-TR_SEED=590162
-TE_SEED=261069
-TRAIN_FNAME="train.dat"
+TR_SEED=50321
+TE_SEED=12305
+TRAIN_FNAME="train_50.dat"
+INPUT_FNAME="train.dat"
 NU=0.5
-for m in 25 50 75; do 
-	# Generate training set
-	#./gensvmdat train_$m.dat $m ${TR_SEED}
-	cp train_$m.dat ${TRAIN_FNAME}
-	# Remove asterisks
-	sed -i ''  -e 's/\*//g'  ${TRAIN_FNAME}
-	export PATH=${PATH}:${AMPL_PATH}
-	echo "m = ${m}, nu = ${NU}, Primal SVM:"
-	printf "${NUM_PARAM}\n${m}\n${NU}" | ./SVM.run | tail -n ${NUM_PARAM}
-	echo "m = ${m}, nu = ${NU}, Dual SVM:"
-	printf "${NUM_PARAM}\n${m}\n${NU}" | ./DualSVM.run | tail -n ${NUM_PARAM}
-	#./gensvmdat test_$i.dat $i ${TE_SEED}
-done
+# Remove asterisks
+sed -i ''  -e 's/\*//g'  ${TRAIN_FNAME}
+cp ${TRAIN_FNAME} ${INPUT_FNAME}
+export PATH=${PATH}:${AMPL_PATH}
+m=50
+echo "m = ${m}, nu = ${NU}, Primal SVM:"
+printf "${NUM_PARAM}\n${m}\n${NU}" | ./SVM.run | tail -n $(expr ${NUM_PARAM} + 1) |  tee out_${TRAIN_FNAME}
+echo "m = ${m}, nu = ${NU}, Dual SVM:"
+printf "${NUM_PARAM}\n${m}\n${NU}" | ./DualSVM.run | tail -n ${NUM_PARAM}
+rm ${INPUT_FNAME}
 ```
+
+We can see that both the primal and dual SVM obtain the same parameter vector $\mathbf{w}$. 
+This is expected because the SVM, as a quadratic problem, benefits from strong duality, which means that the primal and dual solutions will be the same. 
+
+We will now test that this holds on a bigger dataset. Moreover, we will test the accuracy of the obtained parameter vector on a test set that is different from the training set. 
+
+```{bash, engine.opts='-l', echo=FALSE}
+AMPL_PATH="/Applications/ampl_macos64"
+PATH=${PATH}:${AMPL_PATH}
+NUM_PARAM=4
+TR_SEED=50321
+TE_SEED=12305
+TRAIN_FNAME="train_10000.dat"
+INPUT_FNAME="train.dat"
+NU=0.5
+NUM_DATA_PT=10000
+cp ${TRAIN_FNAME} ${INPUT_FNAME}
+# Remove asterisks
+sed -i ''  -e 's/\*//g' ${INPUT_FNAME}
+echo "m = ${NUM_DATA_PT}, nu = ${NU}, Primal SVM:"
+echo -e "${NUM_PARAM}\n${NUM_DATA_PT}\n${NU}" | ./SVM.run | tail -n ${NUM_PARAM}
+echo "m = ${NUM_DATA_PT}, nu = ${NU}, Dual SVM:"
+#echo -e "${NUM_PARAM}\n${NUM_DATA_PT}\n${NU}" | ./DualSVM.run | tail -n ${NUM_PARAM} 
+rm ${INPUT_FNAME}
+```
+
+Again, the parameter vectors which result from solving the primal and dual problems are the same. 
+In order to classify a point, we now only need to see on which side of the hyperplane does it fall, that is if $\mathbf{w}^T \mathbf{x} + \gamma > 0$. 
+
+```{r solvesvmfunc, echo=FALSE, results="markup", comment=""}
+PARAM_FILE_NAME = "out_train_50.dat"
+DATA_FILE_NAME = "train_50.dat"
+parse_ampl_out <- function(param_file_name) {
+  w = c()
+  con = file(param_file_name, "r")
+  gamma = as.numeric(strsplit(readLines(con, n = 1), " ")[[1]][3])
+    while (TRUE) {
+      line = readLines(con, n = 1)
+      if (length(line) == 0) {
+        break
+      }
+      w = unlist(c(w, as.numeric(strsplit(line, " ")[[1]][3])))
+    }
+  params <- list("w" = w, "gamma" = gamma)
+}
+
+get_svm_accuracy <- function(data_file_name, w, gamma, num_param) {
+  data <- read.table(data_file_name)
+  nts <- 0
+  ncor <- 0
+  for (i in 1:nrow(data)) {
+    y <- t(w) %*% as.numeric(data[i, 1:num_param]) + gamma > 0
+    nts <- nts + 1
+    if ((y == TRUE &&  data[i, num_param+1] == 1) || (y == FALSE &&  data[i, num_param+1] != 1)) {
+      ncor <- ncor + 1
+    }
+  }
+  acc <- c(ncor, nts)
+}
+```
+``````{r solvesvm, echo=FALSE, results="markup", comment=""}
+params <- parse_ampl_out(PARAM_FILE_NAME)
+w = params$w
+gamma = params$gamma
+cat ("w = ", w, "\n")
+cat("gamma = ", gamma, "\n")
+
+svm_acc <- get_svm_accuracy(DATA_FILE_NAME, w, gamma, 4)
+ncor <- svm_acc[1]
+nts <- svm_acc[2]
+cat("Correctly classified", ncor, "/", nts, " points on the training set", "\n")
+```
+
+We can see that, on a dataset of 50 points, the trained SVM is able to correctly classify 9499 of the, or about 95%.
+
+We will now run a battery of tests on the same dataset, varying the values of $\nu$, in order to observe variations in generalization power. 
+
+```{bash, engine.opts='-l', echo=FALSE}
+AMPL_PATH="/Applications/ampl_macos64"
+PATH=${PATH}:${AMPL_PATH}
+NUM_PARAM=4
+TR_SEED=50321
+TE_SEED=12305
+TRAIN_FNAME="train_50.dat"
+INPUT_FNAME="train.dat"
+NUM_DATA_PT=50
+cp ${TRAIN_FNAME} ${INPUT_FNAME}
+# Remove asterisks
+sed -i ''  -e 's/\*//g' ${INPUT_FNAME}
+for NU in 0.1 0.5 1 5
+do
+  echo -e "${NUM_PARAM}\n${NUM_DATA_PT}\n${NU}" | ./SVM.run | tail -n $(expr ${NUM_PARAM} + 1) |  tee out_nu${NU}_${TRAIN_FNAME}
+done
+rm ${INPUT_FNAME}
+```
+
+```{r testsvm, echo=FALSE, results="markup", comment=""}
+for (nu in c(0.1, 0.5, 1, 5)) {
+  paramfile <- paste("out_nu", nu, "_train_50.dat", sep="")
+  print(paramfile)
+  params <- parse_ampl_out(paramfile)
+  w = params$w
+  gamma = params$gamma
+  cat ("w = ", w, "\n")
+  cat("gamma = ", gamma, "\n")
+  
+  datafile <- "test_50.dat"
+  svm_acc <- get_svm_accuracy(datafile, w, gamma)
+  ncor <- svm_acc[1]
+  nts <- svm_acc[2]
+  cat("Correctly classified", ncor, "/", nts, " points on the test set", "\n")
+}
+```
+
+## Rice Varieties
+
+```{bash, engine.opts='-l', echo=FALSE}
+AMPL_PATH="/Applications/ampl_macos64"
+PATH=${PATH}:${AMPL_PATH}
+NUM_PARAM=7
+INPUT_FNAME="train.dat"
+TRAIN_FNAME="rice.dat"
+NUM_DATA_PT=3809
+cp ${TRAIN_FNAME} ${INPUT_FNAME}
+for NU in 0.1 0.5 1 5
+do
+  echo -e "${NUM_PARAM}\n${NUM_DATA_PT}\n${NU}" | ./SVM.run | tail -n $(expr ${NUM_PARAM} + 1) |  tee out_nu${NU}_${TRAIN_FNAME}
+done
+rm ${INPUT_FNAME}
+```
+  
+```{r testsvmrice, echo=FALSE, results="markup", comment=""}
+for (nu in c(0.1, 0.5, 1, 5)) {
+  paramfile <- paste("out_nu", nu, "_rice.dat", sep="")
+  print(paramfile)
+  params <- parse_ampl_out(paramfile)
+  w = params$w
+  gamma = params$gamma
+  cat ("w = ", w, "\n")
+  cat("gamma = ", gamma, "\n")
+  
+  datafile <- "rice.dat"
+  svm_acc <- get_svm_accuracy(datafile, w, gamma, 7)
+  ncor <- svm_acc[1]
+  nts <- svm_acc[2]
+  cat("Correctly classified", ncor, "/", nts, " points on the test set", "\n")
+}
+```
+
+# Conclusions
