@@ -79,8 +79,6 @@ Again, the parameter vectors which result from solving the primal and dual probl
 In order to classify a point, we now only need to see on which side of the hyperplane does it fall, that is if $\mathbf{w}^T \mathbf{x} + \gamma > 0$. 
 
 ```{r solvesvmfunc, echo=FALSE, results="markup", comment=""}
-PARAM_FILE_NAME = "out_train_50.dat"
-DATA_FILE_NAME = "train_50.dat"
 parse_ampl_out <- function(param_file_name) {
   w = c()
   con = file(param_file_name, "r")
@@ -109,7 +107,9 @@ get_svm_accuracy <- function(data_file_name, w, gamma, num_param) {
   acc <- c(ncor, nts)
 }
 ```
-``````{r solvesvm, echo=FALSE, results="markup", comment=""}
+```{r solvesvm, echo=FALSE, results="markup", comment=""}
+PARAM_FILE_NAME = "out_train_50.dat"
+DATA_FILE_NAME = "train_50.dat"
 params <- parse_ampl_out(PARAM_FILE_NAME)
 w = params$w
 gamma = params$gamma
@@ -156,7 +156,7 @@ for (nu in c(0.1, 0.5, 1, 5)) {
   cat("gamma = ", gamma, "\n")
   
   datafile <- "test_50.dat"
-  svm_acc <- get_svm_accuracy(datafile, w, gamma)
+  svm_acc <- get_svm_accuracy(datafile, w, gamma, 4)
   ncor <- svm_acc[1]
   nts <- svm_acc[2]
   cat("Correctly classified", ncor, "/", nts, " points on the test set", "\n")
@@ -164,6 +164,31 @@ for (nu in c(0.1, 0.5, 1, 5)) {
 ```
 
 ## Rice Varieties
+
+We will now test the primal and dual formulations on a dataset concerning different kinds of rice, in order to ensure that, as expected, primal and dual formulations of the SVM give the same results.
+
+```{bash, engine.opts='-l', echo=FALSE}
+AMPL_PATH="/Applications/ampl_macos64"
+NUM_PARAM=7
+TRAIN_FNAME="rice.dat"
+INPUT_FNAME="train.dat"
+DUAL_OUT_FNAME="dual_out.txt"
+NU=0.5
+# Remove asterisks
+sed -i ''  -e 's/\*//g'  ${TRAIN_FNAME}
+cp ${TRAIN_FNAME} ${INPUT_FNAME}
+export PATH=${PATH}:${AMPL_PATH}
+m=3809
+echo "m = ${m}, nu = ${NU}, Primal SVM:"
+time $(printf "${NUM_PARAM}\n${m}\n${NU}" | ./SVM.run | tail -n $(expr ${NUM_PARAM} + 1) > out_${TRAIN_FNAME})
+cat out_$TRAIN_FNAME
+echo "m = ${m}, nu = ${NU}, Dual SVM:"
+time $(printf "${NUM_PARAM}\n${m}\n${NU}" | time ./DualSVM.run | tail -n ${NUM_PARAM} > ${DUAL_OUT_FNAME})
+cat ${DUAL_OUT_FNAME}
+rm ${DUAL_OUT_FNAME}
+rm ${INPUT_FNAME}
+```
+
 
 ```{bash, engine.opts='-l', echo=FALSE}
 AMPL_PATH="/Applications/ampl_macos64"
@@ -181,6 +206,7 @@ rm ${INPUT_FNAME}
 ```
   
 ```{r testsvmrice, echo=FALSE, results="markup", comment=""}
+
 for (nu in c(0.1, 0.5, 1, 5)) {
   paramfile <- paste("out_nu", nu, "_rice.dat", sep="")
   print(paramfile)
