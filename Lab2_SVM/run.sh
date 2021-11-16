@@ -20,8 +20,8 @@ for dataset_str in "train_50.dat test_50.dat 4 50" "rice_50.dat rice_test_50.dat
 	cp "${dataset}" "${TRAIN_FILENAME}"
 
 	model="./GaussianSVM.run"
-	for sigmasq in 0.001 0.01 0.02 0.05 0.1 0.2 0.5 1 2 5 10 20 100; do
-		for nu in 0 0.001 0.01 0.1 0.5 1 5 10 20 100; do
+	for sigmasq in  0.01  0.1 0.2 0.5 1  5 10  100; do
+		for nu in 0 0.001 0.01 0.1 0.5 1 5 10 100; do
 			res1=$(date +%s)
 			out=$(printf "${num_param}\n${num_data}\n${sigmasq}\n${nu}" | $model | tail -n $(expr ${num_data} + 1) | cut -d" " -f3- | tr '\n;' ' ')
 			acc=$(./accuracy_gaussian.R ${dataset_test} ${model} ${sigmasq} ${num_data} ${out})
@@ -32,7 +32,7 @@ for dataset_str in "train_50.dat test_50.dat 4 50" "rice_50.dat rice_test_50.dat
 	done
 
 	for model in ./SVM.run ./DualSVM.run; do
-		for nu in 0.1 0.5 1 5; do
+		for nu in 0 0.001 0.01 0.1 0.5 1 5 10 100; do
 			res1=$(date +%s)
 			out=$(printf "${num_param}\n${num_data}\n${nu}" | $model | tail -n $(expr ${num_param} + 1) | cut -d" " -f3-)
 			out=$(echo $out | sed 's/\ /,/g')
