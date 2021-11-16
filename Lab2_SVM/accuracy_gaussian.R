@@ -11,10 +11,10 @@ X <- read.table(filename)
 nts <- 0
 ncor <- 0
 for (i in 1:nrow(X)) {
-	x <-  X[i, 1:ncol(X)]
+	x <-  X[i, 1:ncol(X)-1]
 	rbfk <- c()
 	for (j in 1:nrow(X)) {
-		xj <- X[j, 1:ncol(X)]
+		xj <- X[j, 1:ncol(X)-1]
 		rbfk <- unlist(c(rbfk, exp(-sum((x - xj)^2)/sigmasq)))
 	}
 	t <- X[[ncol(X)]]

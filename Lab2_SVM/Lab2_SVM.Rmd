@@ -213,7 +213,7 @@ divide_string <- function(str) {
 data$acc <- unlist(lapply(data$acc, divide_string))
 ```
 
-First, we plot CPU time with respect to model formulation, primal and dual.
+First, we plot CPU time with respect to model formulation, primal and dual, on a bigger dataset, where the variation can be noticeable.
 
 ```{r cputime, echo = FALSE}
 boxplot(cpusec ~ model, data = data, xlab = "Model", ylab="CPU time (s)", col = 10:15)
@@ -221,8 +221,10 @@ boxplot(cpusec ~ model, data = data, xlab = "Model", ylab="CPU time (s)", col = 
 
 We can see that the dual formulation is much slower in general. This is expected because, on both datasets, $n >> d$ and the dual formulation is nonparametric, i.e. scales with dataset size and not parameter count. 
 
+We now plot CPU time of the dual formulation with respect to 
+
 We now plot accuracy with respect to $\nu$.
-```{r acc, echo = FALSE}
+```{r accnu, echo = FALSE}
 boxplot(acc ~ nu, data = data, xlab = "nu", ylab="Accuracy", col = 10:15)
 ```
 
@@ -230,7 +232,7 @@ We can see that accuracy increases with $\nu$, topping out at $\nu = 1$.
 This is expected because the $\nu$ parameter can be interpreter as an inverse regularizer of the solution, which increases goodness of fit on the training set. 
 The limit value of $\nu = \infty$ translates to the hard-margin SVM, where separation is perfect.
 
-```{r acc, echo = FALSE}
+```{r accsigma, echo = FALSE}
 library(dplyr)
 boxplot(acc ~ sigmasq, data = filter(data, sigmasq != 'n/a'), xlab = "Sigma^2", ylab="Accuracy", col = 10:15)
 ```
