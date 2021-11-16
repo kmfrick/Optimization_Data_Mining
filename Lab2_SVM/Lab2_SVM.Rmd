@@ -230,6 +230,9 @@ We can see that accuracy increases with $\nu$, topping out at $\nu = 1$.
 This is expected because the $\nu$ parameter can be interpreter as an inverse regularizer of the solution, which increases goodness of fit on the training set. 
 The limit value of $\nu = \infty$ translates to the hard-margin SVM, where separation is perfect.
 
-
+```{r acc, echo = FALSE}
+library(dplyr)
+boxplot(acc ~ sigmasq, data = filter(data, sigmasq != 'n/a'), xlab = "Sigma^2", ylab="Accuracy", col = 10:15)
+```
 
 # Conclusions

@@ -24,8 +24,8 @@ for dataset_str in "train_50.dat test_50.dat 4 50" "rice_50.dat rice_test_50.dat
 		for nu in 0 0.001 0.01 0.1 0.5 1 5 10 20 100; do
 			res1=$(date +%s)
 			out=$(printf "${num_param}\n${num_data}\n${sigmasq}\n${nu}" | $model | tail -n $(expr ${num_data} + 1) | cut -d" " -f3- | tr '\n;' ' ')
-			res2=$(date +%s)
 			acc=$(./accuracy_gaussian.R ${dataset_test} ${model} ${sigmasq} ${num_data} ${out})
+			res2=$(date +%s)
 			out=$(echo ${out} | tr ' ' ',')
 			echo "$dataset_test;${num_data};$nu;${sigmasq};$model;$(echo "$res2 - $res1" | bc);$acc"
 		done;
@@ -36,8 +36,8 @@ for dataset_str in "train_50.dat test_50.dat 4 50" "rice_50.dat rice_test_50.dat
 			res1=$(date +%s)
 			out=$(printf "${num_param}\n${num_data}\n${nu}" | $model | tail -n $(expr ${num_param} + 1) | cut -d" " -f3-)
 			out=$(echo $out | sed 's/\ /,/g')
-			res2=$(date +%s)
 			acc=$(echo "$dataset_test,${num_data},$nu,$model,$(echo "$res2 - $res1" | bc), $out" | ./accuracy.R ${num_param} | sed -e 's/\ /,/g')
+			res2=$(date +%s)
 			echo "$dataset_test;${num_data};$nu;n/a;$model;$(echo "$res2 - $res1" | bc);$acc"
 		done;
 	done;

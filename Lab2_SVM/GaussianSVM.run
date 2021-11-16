@@ -30,25 +30,9 @@ read nu <-;
 
 solve;
 
-# Get gamma using the kernel trick to avoid computing the feature map
+# Gamma is 0 when using kernels
+# See Poggio et al. 2001
 param gamma default 0;
-param idx; # Auxiliary variable
-param found_nbsv default 0;
-
-param EPS := 0.000001; # Numerical errors, so equality and inequality are defined with some slack
-
-# Loop over the lambda vector and find a non-bound SV
-for {i in {1..m}} {
-	if lambda[i] > EPS and lambda[i] < (nu - EPS) then {
-	  let idx := i;
-		let found_nbsv := 1;
-	  break;
-	}
-}
-
-if found_nbsv > 0 then {
-	let gamma := 1 / y[idx] - sum{j in 1..m} lambda[j] * exp(-sum{k in 1..n} ((A[idx, k] - A[j, k]) ^ 2));
-}
 
 printf "gamma = %lf\n", gamma;
 
