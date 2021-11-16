@@ -23,6 +23,22 @@ The dual, on the other hand, is implemented as follows.
 cat(readLines("DualSVM.mod"),sep="\n")
 ```
 
+In the dual model, the `.run` file is slightly more complex because the primal solution must be retrieved from the dual model. 
+
+Given the dual solution vector $\mathbf{\lambda}$, the primal solution $\mathbf{w}$ is found as
+$w_j = \sum_{i=1}^m \lambda_i y_i A_{ij}$.
+
+The plane intercept $\gamma$, on the other hand, is found exploiting complementary slackness.
+Since $\lambda_i (y_i (\mathbf{w}^T \mathbf{x}_i + \gamma) - 1 + \zeta_i) = 0$, when a point $k$ is a non-bound support vector we have $\lambda_k \in (0, \nu) \implies \zeta_k = 0$ and therefore $\gamma = \frac{1}{y_k} - \mathbf{w}^T \mathbf{x}_i$. 
+
+Since the solution is found numerically, the condition $\lambda_k \in (0, \nu)$ is checked with some slack $\epsilon$ to counter numerical errors in the computation.
+
+This results in the following AMPL code.
+
+```{r svmdualrun, echo=FALSE, results="markup", comment=""}
+cat(readLines("DualSVM.run"),sep="\n")
+```
+
 # Computational study
 
 ## gensvmdat
@@ -124,45 +140,6 @@ cat("Correctly classified", ncor, "/", nts, " points on the training set", "\n")
 
 We can see that, on a dataset of 50 points, the trained SVM is able to correctly classify 9499 of the, or about 95%.
 
-We will now run a battery of tests on the same dataset, varying the values of $\nu$, in order to observe variations in generalization power. 
-
-```{bash, engine.opts='-l', echo=FALSE}
-AMPL_PATH="/Applications/ampl_macos64"
-PATH=${PATH}:${AMPL_PATH}
-NUM_PARAM=4
-TR_SEED=50321
-TE_SEED=12305
-TRAIN_FNAME="train_50.dat"
-INPUT_FNAME="train.dat"
-NUM_DATA_PT=50
-cp ${TRAIN_FNAME} ${INPUT_FNAME}
-# Remove asterisks
-sed -i ''  -e 's/\*//g' ${INPUT_FNAME}
-for NU in 0.1 0.5 1 5
-do
-  echo -e "${NUM_PARAM}\n${NUM_DATA_PT}\n${NU}" | ./SVM.run | tail -n $(expr ${NUM_PARAM} + 1) |  tee out_nu${NU}_${TRAIN_FNAME}
-done
-rm ${INPUT_FNAME}
-```
-
-```{r testsvm, echo=FALSE, results="markup", comment=""}
-for (nu in c(0.1, 0.5, 1, 5)) {
-  paramfile <- paste("out_nu", nu, "_train_50.dat", sep="")
-  print(paramfile)
-  params <- parse_ampl_out(paramfile)
-  w = params$w
-  gamma = params$gamma
-  cat ("w = ", w, "\n")
-  cat("gamma = ", gamma, "\n")
-  
-  datafile <- "test_50.dat"
-  svm_acc <- get_svm_accuracy(datafile, w, gamma, 4)
-  ncor <- svm_acc[1]
-  nts <- svm_acc[2]
-  cat("Correctly classified", ncor, "/", nts, " points on the test set", "\n")
-}
-```
-
 ## Rice Varieties
 
 We will now test the primal and dual formulations on a dataset concerning different kinds of rice, in order to ensure that, as expected, primal and dual formulations of the SVM give the same results.
@@ -176,7 +153,7 @@ DUAL_OUT_FNAME="dual_out.txt"
 NU=0.5
 # Remove asterisks
 sed -i ''  -e 's/\*//g'  ${TRAIN_FNAME}
-cp ${TRAIN_FNAME} ${INPUT_FNAME}
+cp ${TRAIN_FNAME} ${INPUT_FNAME}    
 export PATH=${PATH}:${AMPL_PATH}
 m=3809
 echo "m = ${m}, nu = ${NU}, Primal SVM:"
@@ -220,8 +197,53 @@ for (nu in c(0.1, 0.5, 1, 5)) {
   svm_acc <- get_svm_accuracy(datafile, w, gamma, 7)
   ncor <- svm_acc[1]
   nts <- svm_acc[2]
-  cat("Correctly classified", ncor, "/", nts, " points on the test set", "\n")
+  cat("Correctly classified", ncor, "/", nts, " points", "\n")
 }
 ```
+
+# Computational study on the rice dataset
+
+After generating a .csv file with the outputs resulting from different datasets, varying the values of $\nu$, we will now observe variations in accuracy and CPU time across different formulations.  
+
+```{r readdata, echo=FALSE}
+data <- read.csv('test.csv', header=TRUE, sep=";")
+data$nu <- as.factor(data$nu)
+divide_string <- function(str) {
+ str <- strsplit(str, ",")[[1]]
+ round(as.numeric(str[1]) / as.numeric(str[2]), 3)
+}
+get_gamma <- function(str) {
+  round(as.numeric(strsplit(str, ",")[[1]][1]), 4)
+}
+get_w <- function(str) {
+  params <- strsplit(str, ",")[[1]]
+  w <- c()
+  for (i in 2:length(params)) {
+    wi <- round(as.numeric(params[i]), 4)
+    w <- unlist(c(w, wi))
+  }
+  w
+}
+data$gamma <- unlist(lapply(data$params, get_gamma))
+data$w <- lapply(data$params, get_w)
+data$acc <- unlist(lapply(data$acc, divide_string))
+```
+
+First, we plot CPU time with respect to model formulation, primal and dual.
+
+```{r cputime, echo = FALSE}
+boxplot(cpusec ~ model, data = data, xlab = "Model", ylab="CPU time (s)", col = 10:15)
+```
+
+We can see that the dual formulation is much slower in general. This is expected because, on both datasets, $n >> d$ and the dual formulation is nonparametric, i.e. scales with dataset size and not parameter count. 
+
+We now plot accuracy with respect to $\nu$.
+```{r acc, echo = FALSE}
+boxplot(acc ~ nu, data = data, xlab = "nu", ylab="Accuracy", col = 10:15)
+```
+
+We can see that accuracy increases with $\nu$, topping out at $\nu = 1$. 
+This is expected because the $\nu$ parameter can be interpreter as an inverse regularizer of the solution, which increases goodness of fit on the training set. 
+The limit value of $\nu = \infty$ translates to the hard-margin SVM, where separation is perfect.
 
 # Conclusions

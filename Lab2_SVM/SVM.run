@@ -13,15 +13,12 @@ for {i in 1..m} {
 }
 
 option solver cplex;
-show;
 
 printf "Enter the parameter nu: ";
 read nu <-;
-expand;
 
 solve;
 printf "gamma = %lf\n", gamma;
 for {j in 1..n} {
 	printf "w_%d = %lf\n", j, w[j];
 }
-

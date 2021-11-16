@@ -1,5 +1,5 @@
 #!/usr/bin/env ampl
-model DualSVM.mod;
+model GaussianSVM.mod;
 printf "Enter number of features n: ";
 read n <-;
 printf "Enter number of data points m: ";
@@ -20,10 +20,7 @@ read nu <-;
 
 solve;
 
-# Retrieve primal solution from the dual
-param w {1..n};
-let {j in {1..n}} w[j] := sum{i in 1..m} lambda[i] * y[i] * A[i, j];
-
+# Get gamma using the kernel trick to avoid computing the feature map
 param gamma default 0;
 param idx; # Auxiliary variable
 param found_nbsv default 0;
@@ -32,7 +29,6 @@ param EPS := 0.000001; # Numerical errors, so equality and inequality are define
 
 # Loop over the lambda vector and find a non-bound SV
 for {i in {1..m}} {
-  printf "lambda_%d = %lf\n", i, lambda[i];
 	if lambda[i] > EPS and lambda[i] < (nu - EPS) then {
 	  let idx := i;
 		let found_nbsv := 1;
@@ -41,10 +37,11 @@ for {i in {1..m}} {
 }
 
 if found_nbsv > 0 then {
-	let gamma := 1 / y[idx] - sum{j in 1..n} w[j] * A[idx, j];
+	let gamma := 1 / y[idx] - sum{j in 1..m} lambda[j] * exp(-sum{k in 1..n} ((A[idx, k] - A[j, k]) ^ 2));
 }
+
 printf "gamma = %lf\n", gamma;
 
-for {j in 1..n} {
-	printf "w_%d = %lf\n", j, w[j]
+for {j in 1..m} {
+	printf "lambda_%d = %lf\n", j, lambda[j]
 }

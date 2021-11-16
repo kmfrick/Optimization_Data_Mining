@@ -10,14 +10,22 @@ df <- read.table(filename)
 nts <- 0
 ncor <- 0
 gamma <- 0
-w <- 0
+lambda <- 0
 gamma <- info[, 6]
-w <- unlist(info[, 7:ncol(info[1,])])
+lambda <- unlist(info[, 7:ncol(info[1,])])
+
 
 for (i in 1:nrow(df)) {
-	y <- t(w) %*% as.numeric(df[i, 1:num_param]) + gamma > 0
+	x <-  df[i, 1:ncol(df)]
+	rbfk <- c()
+	for (j in 1:nrow(df)) {
+		xj <- df[j, 1:ncol(df)]
+		rbfk <- unlist(c(exp(-norm(x - xj, type="2"))))
+	}
+	t <- df[[ncol(df)]]
+	y <- sum(lambda * t * rbfk) + gamma > 0
 	nts <- nts + 1
-	if ((y == TRUE &&  df[i, num_param+1] == 1) || (y == FALSE &&  df[i, num_param+1] != 1)) {
+	if ((y == TRUE &&  df[i, ncol(df)] == 1) || (y == FALSE &&  df[i, ncol(df)] != 1)) {
 		ncor <- ncor + 1
 	}
 	acc <- c(ncor, nts)
