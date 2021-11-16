@@ -10,9 +10,6 @@ output:
 
 The assignment is concerned with the analysis of the optimization problems entailed by the usage of a support vector machine as a classification algorithm. 
 
-
-
-# Primal and dual SVMs 
 The primal formulation of the SVM is implemented in AMPL as follows. 
 
 ```{r svmprimal, echo=FALSE, results="markup", comment=""}
@@ -123,6 +120,7 @@ get_svm_accuracy <- function(data_file_name, w, gamma, num_param) {
   acc <- c(ncor, nts)
 }
 ```
+
 ```{r solvesvm, echo=FALSE, results="markup", comment=""}
 PARAM_FILE_NAME = "out_train_50.dat"
 DATA_FILE_NAME = "train_50.dat"
@@ -201,7 +199,7 @@ for (nu in c(0.1, 0.5, 1, 5)) {
 }
 ```
 
-# Computational study on the rice dataset
+# Computational study
 
 After generating a .csv file with the outputs resulting from different datasets, varying the values of $\nu$, we will now observe variations in accuracy and CPU time across different formulations.  
 
@@ -212,20 +210,6 @@ divide_string <- function(str) {
  str <- strsplit(str, ",")[[1]]
  round(as.numeric(str[1]) / as.numeric(str[2]), 3)
 }
-get_gamma <- function(str) {
-  round(as.numeric(strsplit(str, ",")[[1]][1]), 4)
-}
-get_w <- function(str) {
-  params <- strsplit(str, ",")[[1]]
-  w <- c()
-  for (i in 2:length(params)) {
-    wi <- round(as.numeric(params[i]), 4)
-    w <- unlist(c(w, wi))
-  }
-  w
-}
-data$gamma <- unlist(lapply(data$params, get_gamma))
-data$w <- lapply(data$params, get_w)
 data$acc <- unlist(lapply(data$acc, divide_string))
 ```
 
@@ -245,5 +229,7 @@ boxplot(acc ~ nu, data = data, xlab = "nu", ylab="Accuracy", col = 10:15)
 We can see that accuracy increases with $\nu$, topping out at $\nu = 1$. 
 This is expected because the $\nu$ parameter can be interpreter as an inverse regularizer of the solution, which increases goodness of fit on the training set. 
 The limit value of $\nu = \infty$ translates to the hard-margin SVM, where separation is perfect.
+
+
 
 # Conclusions

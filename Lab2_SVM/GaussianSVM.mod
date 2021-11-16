@@ -5,6 +5,7 @@ param nu >= 0;
 param y {1..m};
 param A {1..m, 1..n};
 param K {1..m, 1..m};
+param sigmasq;
 
 var lambda {1..m} >=0, <=nu;
 

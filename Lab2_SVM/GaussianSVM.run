@@ -4,7 +4,8 @@ printf "Enter number of features n: ";
 read n <-;
 printf "Enter number of data points m: ";
 read m <-;
-
+printf "Enter parameter sigma^2: ";
+read sigmasq <-;
 for {i in 1..m} {
 	for {j in 1..n} {
 		read A[i, j] < train.dat;
@@ -15,7 +16,7 @@ for {i in 1..m} {
 param tmp;
 for {i in 1..m} {
 	for {j in i..m} {
-		let tmp := exp(-sum{k in 1..n} ((A[i, k] - A[j, k]) ^ 2));
+		let tmp := exp(-sum{k in 1..n} ((A[i, k] - A[j, k]) ^ 2) / sigmasq);
 		let K[i, j] := tmp;
 		let K[j, i] := tmp;
 	}
