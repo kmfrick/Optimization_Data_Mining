@@ -12,6 +12,15 @@ for {i in 1..m} {
 	read y[i] < train.dat;
 }
 
+param tmp;
+for {i in 1..m} {
+	for {j in i..m} {
+		let tmp := exp(-sum{k in 1..n} ((A[i, k] - A[j, k]) ^ 2));
+		let K[i, j] := tmp;
+		let K[j, i] := tmp;
+	}
+}
+
 option solver cplex;
 # show;
 
