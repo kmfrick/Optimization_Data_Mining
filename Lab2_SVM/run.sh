@@ -3,7 +3,7 @@
 
 # Config
 TRAIN_FILENAME="train.dat"
-AMPL_PATH="/Applications/ampl_macos64"
+AMPL_PATH="/Applications/ampl_macos64:$HOME/ampl/ampl_linux-intel64/"
 export PATH=${PATH}:${AMPL_PATH}
 export LC_ALL=C
 

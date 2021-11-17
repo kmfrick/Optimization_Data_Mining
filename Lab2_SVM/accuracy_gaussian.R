@@ -14,23 +14,21 @@ Xtr <- as.matrix(read.table(filename_training))
 Xte <- as.matrix(read.table(filename))
 num_data <- nrow(Xte)
 num_features_orig <- ncol(Xte) -1
-K <- 0
+K <- 1:nrow(Xte)
 rbf <- function(x, y) exp(-norm(x - y, type='2')^2/sigmasq)
-K <- outer(
-					 1:num_data, 1:num_features,
-					 Vectorize(function(i, j) {
-											 if (lambda[j] == 0) {
-												 0
-											 } else {
-												 rbf(Xte[i,1:num_features_orig], Xtr[j,1:num_features_orig])
-											 }
+for (i in 1:nrow(Xte)) {
+	m = 0;
+	for (j in 1:nrow(Xtr)) {
+		if (lambda[j] > 0) {
+			m <- m + lambda[j] * Xtr[j,ncol(Xtr)] * rbf(Xte[i,1:num_features_orig], Xtr[j,1:num_features_orig]);
+		}
+	}
+	K[i] <- m;
 }
-					 ))
 y <- Xte[1:nrow(Xte), ncol(Xte)]
 ncor <- 0
 for (i in 1:nrow(Xte)) {
-	t <- Xtr[1:nrow(Xtr),ncol(Xtr)]
-	yhat <- (sum(lambda * t * K[i,]) + gamma) > 0
+	yhat <- (K[i] + gamma) > 0
 	if ((yhat == TRUE &&  y[i] == 1) || (yhat == FALSE &&  y[i] != 1)) {
 		ncor <- ncor + 1
 	}
