@@ -230,6 +230,8 @@ The accuracy tests are made on a test set which is different from that used for 
 ```{r readdata, echo=FALSE}
 data <- read.csv('test.csv', header=TRUE, sep=";")
 data$nu <- as.factor(data$nu)
+levels(data$model)[levels(data$model)=="./DualSVM.run"] <- "Dual"
+levels(data$model)[levels(data$model)=="./SVM.run"] <- "Primal"
 divide_string <- function(str) {
  str <- strsplit(str, ",")[[1]]
  round(as.numeric(str[1]) / as.numeric(str[2]), 3)
@@ -269,7 +271,7 @@ We can see that, as expected, the dual formulation scales badly with dataset siz
 Finally, we print CPU time of the primal formulation with respect to dataset size. A boxplot is hardly significant since, as we can see, CPU time is either 1 second or lower. This also matches what is expected from the theoretical analysis, as the primal formulation does not scale with data set size.
 
 ```{r cputimeprim, echo = FALSE}
-primal_cputime <- filter(cputime_data, model=='./SVM.run')
+primal_cputime <- filter(cputime_data, model=='Primal')
 print(select(primal_cputime, dataset,num_features,cpusec))
 ```
 ## Accuracy and regularization
