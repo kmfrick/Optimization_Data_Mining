@@ -12,26 +12,26 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 
 # Support vector machines
 
-The assignment is concerned with the analysis of the optimization problems entailed by the usage of a support vector machine as a classification algorithm. 
+The assignment is concerned with the analysis of the optimization problems entailed by the usage of a support vector machine as a classification algorithm.
 
-The primal formulation of the SVM is implemented in AMPL as follows. 
+The primal formulation of the SVM is implemented in AMPL as follows.
 
 ```{r svmprimal, echo=FALSE, results="markup", comment=""}
 cat(readLines("SVM.mod"),sep="\n")
 ```
-The dual, on the other hand, is implemented as follows. 
+The dual, on the other hand, is implemented as follows.
 
 ```{r svmdual, echo=FALSE, results="markup", comment=""}
 cat(readLines("DualSVM.mod"),sep="\n")
 ```
 
-In the dual model, the `.run` file is slightly more complex because the primal solution must be retrieved from the dual model. 
+In the dual model, the `.run` file is slightly more complex because the primal solution must be retrieved from the dual model.
 
 Given the dual solution vector $\mathbf{\lambda}$, the primal solution $\mathbf{w}$ is found as
 $w_j = \sum_{i=1}^m \lambda_i y_i A_{ij}$.
 
 The plane intercept $\gamma$, on the other hand, is found exploiting complementary slackness.
-Since $\lambda_i (y_i (\mathbf{w}^T \mathbf{x}_i + \gamma) - 1 + \zeta_i) = 0$, when a point $k$ is a non-bound support vector we have $\lambda_k \in (0, \nu) \implies \zeta_k = 0$ and therefore $\gamma = \frac{1}{y_k} - \mathbf{w}^T \mathbf{x}_i$. 
+Since $\lambda_i (y_i (\mathbf{w}^T \mathbf{x}_i + \gamma) - 1 + \zeta_i) = 0$, when a point $k$ is a non-bound support vector we have $\lambda_k \in (0, \nu) \implies \zeta_k = 0$ and therefore $\gamma = \frac{1}{y_k} - \mathbf{w}^T \mathbf{x}_i$.
 
 Since the solution is found numerically, the condition $\lambda_k \in (0, \nu)$ is checked with some slack $\epsilon$ to counter numerical errors in the computation.
 
@@ -84,10 +84,10 @@ printf "${NUM_PARAM}\n${m}\n${NU}" | ./DualSVM.run | tail -n $(expr ${NUM_PARAM}
 rm ${INPUT_FNAME}
 ```
 
-We can see that both the primal and dual SVM obtain the same parameter vector $\mathbf{w}$. 
-This is expected because the SVM, as a quadratic problem, benefits from strong duality, which means that the primal and dual solutions will be the same. 
+We can see that both the primal and dual SVM obtain the same parameter vector $\mathbf{w}$.
+This is expected because the SVM, as a quadratic problem, benefits from strong duality, which means that the primal and dual solutions will be the same.
 
-We will now test that this holds on a bigger dataset. Moreover, we will test the accuracy of the obtained parameter vector on a test set that is different from the training set. 
+We will now test that this holds on a bigger dataset. Moreover, we will test the accuracy of the obtained parameter vector on a test set that is different from the training set.
 
 ```{bash, engine.opts='-l', echo=FALSE}
 AMPL_PATH="/Applications/ampl_macos64"
@@ -105,12 +105,12 @@ sed -i ''  -e 's/\*//g' ${INPUT_FNAME}
 echo "m = ${NUM_DATA_PT}, nu = ${NU}, Primal SVM:"
 echo -e "${NUM_PARAM}\n${NUM_DATA_PT}\n${NU}" | ./SVM.run | tail -n ${NUM_PARAM}
 echo "m = ${NUM_DATA_PT}, nu = ${NU}, Dual SVM:"
-echo -e "${NUM_PARAM}\n${NUM_DATA_PT}\n${NU}" | ./DualSVM.run | tail -n ${NUM_PARAM} 
+echo -e "${NUM_PARAM}\n${NUM_DATA_PT}\n${NU}" | ./DualSVM.run | tail -n ${NUM_PARAM}
 rm ${INPUT_FNAME}
 ```
 
-Again, the parameter vectors which result from solving the primal and dual problems are the same. 
-In order to classify a point, we now only need to see on which side of the hyperplane does it fall, that is if $\mathbf{w}^T \mathbf{x} + \gamma > 0$. 
+Again, the parameter vectors which result from solving the primal and dual problems are the same.
+In order to classify a point, we now only need to see on which side of the hyperplane does it fall, that is if $\mathbf{w}^T \mathbf{x} + \gamma > 0$.
 
 ```{r solvesvmfunc, echo=FALSE, results="markup", comment=""}
 parse_ampl_out <- function(param_file_name) {
@@ -127,14 +127,14 @@ parse_ampl_out <- function(param_file_name) {
   params <- list("w" = w, "gamma" = gamma)
 }
 
-get_svm_accuracy <- function(data_file_name, w, gamma, num_param) {
+get_svm_accuracy <- function(data_file_name, w, gamma, num_features) {
   data <- read.table(data_file_name)
   nts <- 0
   ncor <- 0
   for (i in 1:nrow(data)) {
-    y <- t(w) %*% as.numeric(data[i, 1:num_param]) + gamma > 0
+    y <- t(w) %*% as.numeric(data[i, 1:num_features]) + gamma > 0
     nts <- nts + 1
-    if ((y == TRUE &&  data[i, num_param+1] == 1) || (y == FALSE &&  data[i, num_param+1] != 1)) {
+    if ((y == TRUE &&  data[i, num_features+1] == 1) || (y == FALSE &&  data[i, num_features+1] != 1)) {
       ncor <- ncor + 1
     }
   }
@@ -171,7 +171,7 @@ DUAL_OUT_FNAME="dual_out.txt"
 NU=0.5
 # Remove asterisks
 sed -i ''  -e 's/\*//g'  ${TRAIN_FNAME}
-cp ${TRAIN_FNAME} ${INPUT_FNAME}    
+cp ${TRAIN_FNAME} ${INPUT_FNAME}
 export PATH=${PATH}:${AMPL_PATH}
 m=3809
 echo "m = ${m}, nu = ${NU}, Primal SVM:"
@@ -184,7 +184,7 @@ rm ${DUAL_OUT_FNAME}
 rm ${INPUT_FNAME}
 ```
 
-We see that, on this dataset, both formulations yield the same result as before. However, in this case, there is a much higher number of data points so the dual formulation is much slower. 
+We see that, on this dataset, both formulations yield the same result as before. However, in this case, there is a much higher number of data points so the dual formulation is much slower.
 
 ```{bash, engine.opts='-l', echo=FALSE}
 AMPL_PATH="/Applications/ampl_macos64"
@@ -196,11 +196,11 @@ NUM_DATA_PT=3809
 cp ${TRAIN_FNAME} ${INPUT_FNAME}
 for NU in 0.1 0.5 1 5
 do
-  echo -e "${NUM_PARAM}\n${NUM_DATA_PT}\n${NU}" | ./SVM.run | tail -n $(expr ${NUM_PARAM} + 1) |  tee out_nu${NU}_${TRAIN_FNAME}
+  echo -e "${NUM_PARAM}\n${NUM_DATA_PT}\n${NU}" | ./SVM.run | tail -n $(expr ${NUM_PARAM} + 1) > out_nu${NU}_${TRAIN_FNAME}
 done
 rm ${INPUT_FNAME}
 ```
-  
+
 ```{r testsvmrice, echo=FALSE, results="markup", comment=""}
 
 for (nu in c(0.1, 0.5, 1, 5)) {
@@ -211,7 +211,7 @@ for (nu in c(0.1, 0.5, 1, 5)) {
   gamma = params$gamma
   cat ("w = ", w, "\n")
   cat("gamma = ", gamma, "\n")
-  
+
   datafile <- "rice.dat"
   svm_acc <- get_svm_accuracy(datafile, w, gamma, 7)
   ncor <- svm_acc[1]
@@ -245,20 +245,23 @@ data$acc <- unlist(lapply(data$acc, divide_string))
 First, we plot CPU time with respect to model formulation, primal and dual.
 
 ```{r cputime, echo = FALSE}
-boxplot(cpusec ~ model, data = data, xlab = "Model", ylab="CPU time (s)", col = 10:15, outline=FALSE)
+library(dplyr)
+cputime_data <- read.csv('test_cputime.csv', header=TRUE, sep=";")
+cputime_data$cpusec <- as.integer(cputime_data$cpusec)
+cputime_data$num_features <- as.factor(cputime_data$num_features)
+cputime_data$model <- as.factor(cputime_data$model)
+levels(cputime_data$model)[levels(cputime_data$model)=="./DualSVM.run"] <- "Dual"
+levels(cputime_data$model)[levels(cputime_data$model)=="./SVM.run"] <- "Primal"
+dual_cputime <- filter(cputime_data, model=='Dual')
+boxplot(cpusec ~ model, data = cputime_data, xlab = "Model", ylab="CPU time (s)", col = 10:15, outline=FALSE)
 ```
 
-We can see that the dual formulation is much slower in general. This is expected because, on both datasets, $n >> d$ and the dual formulation is nonparametric, i.e. scales with dataset size and not parameter count. 
+We can see that the dual formulation is much slower in general, even on a small dataset. This is expected because, on both datasets, $n >> d$ and the dual formulation is nonparametric, i.e. scales with dataset size and not parameter count.
 
 We now plot CPU time of the dual formulation with respect to dataset size.
 
 ```{r cputimedual, echo = FALSE}
-library(dplyr)
-cputime_data <- read.csv('test_cputime.csv', header=TRUE, sep=";")
-cputime_data$cpusec <- as.integer(cputime_data$cpusec)
-cputime_data$num_param <- as.factor(cputime_data$num_param)
-dual_cputime <- filter(cputime_data, model=='./DualSVM.run')
-boxplot(cpusec ~ num_param, data = dual_cputime, col =10:15, ylab="CPU time(s)", xlab="Number of data points")
+boxplot(cpusec ~ num_features, data = dual_cputime, col =10:15, ylab="CPU time(s)", xlab="Number of data points")
 ```
 
 We can see that, as expected, the dual formulation scales badly with dataset size, matching the expected curve of $O(n^3)$.
@@ -267,7 +270,7 @@ Finally, we print CPU time of the primal formulation with respect to dataset siz
 
 ```{r cputimeprim, echo = FALSE}
 primal_cputime <- filter(cputime_data, model=='./SVM.run')
-print(select(primal_cputime, dataset,num_param,cpusec))
+print(select(primal_cputime, dataset,num_features,cpusec))
 ```
 ## Accuracy and regularization
 
@@ -278,7 +281,7 @@ boxplot(acc ~ nu, data = data, xlab = "nu", ylab="Accuracy", col = 10:15)
 ```
 
 We can see that accuracy increases with $\nu$, decreasing around $\nu = 0.1$ and topping out at $\nu = 10$, then decreasing again.
-This is expected because the $\nu$ parameter can be interpreter as an inverse regularizer of the solution, which increases generalization power if low, but underfits if too low. 
+This is expected because the $\nu$ parameter can be interpreter as an inverse regularizer of the solution, which increases generalization power if low, but underfits if too low.
 The limit value of $\nu = \infty$ translates to the hard-margin SVM, where separation is perfect.
 
 ## Gaussian kernel parameter
@@ -295,9 +298,9 @@ boxplot(acc ~ sigmasq, data = filter(data, sigmasq != 'n/a'), xlab = "Sigma^2", 
 Our implementations confirm the theoretical properties of the support vector machine, and prove that both the primal and dual formulation are able to obtain very high accuracies even off the training set if the cost parameter $\nu$ is well tuned.
 
 We also see that using a Gaussian kernel allows us to have perfect accuracy, again even using a test set different from the one the SVM is trained on.
-However, this penalizes explainability of the model. 
+However, this penalizes explainability of the model.
 For example, we know that the dataset generated by the `gensvmdat` program separates data according to the $x_1 + x_2 + x_3 + x_4 - 2 = 0$ plane.
-This is reflected in the coefficients of the primal and dual non-kernelized SVM, but not in the learned parameters for the Gaussian kernel. 
+This is reflected in the coefficients of the primal and dual non-kernelized SVM, but not in the learned parameters for the Gaussian kernel.
 
 All in all, this works confirms that the support vector machine is a powerful and flexible tool that can be applied to cases where data is scarce, which can perform well in a high-dimensional feature space through the kernel trick and learn non-linear patterns in the data at hand.
 

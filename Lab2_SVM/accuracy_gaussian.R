@@ -1,29 +1,30 @@
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
 filename <- args[1]
-model <- args[2]
-sigmasq <- as.numeric(args[3])
-num_features <- as.numeric(args[4])
-gamma <- as.numeric(args[5])
-lambda <- as.vector(args[6:length(args)], mode="numeric")
+sigmasq <- as.numeric(args[2])
+num_features <- as.numeric(args[3])
+gamma <- as.numeric(args[4])
+lambda <- as.vector(args[5:length(args)], mode="numeric")
 
-X <- read.table(filename)
+X <- as.matrix(read.table(filename))
+num_data <- nrow(X)
+num_features_orig <- ncol(X) -1
 nts <- 0
 ncor <- 0
+K <- 0
+rbf <- function(x, y) exp(-norm(x - y, type='2')^2/sigmasq)
+K <- outer(
+					 1:num_data, 1:num_data,
+					 Vectorize(function(i, j) rbf(X[i,1:num_features_orig], X[j,1:num_features_orig])))
+
 for (i in 1:nrow(X)) {
-	x <-  X[i, 1:ncol(X)-1]
-	rbfk <- c()
-	for (j in 1:nrow(X)) {
-		xj <- X[j, 1:ncol(X)-1]
-		rbfk <- unlist(c(rbfk, exp(-sum((x - xj)^2)/sigmasq)))
-	}
-	t <- X[[ncol(X)]]
-	y <- (sum(lambda * t * rbfk) + gamma) > 0
+	t <- X[,ncol(X)]
+	y <- (sum(lambda * t * K[i,]) + gamma) > 0
 	nts <- nts + 1
-	if ((y == TRUE &&  X[i, ncol(X)] == 1) || (y == FALSE &&  X[i, ncol(X)] != 1)) {
+	if ((y == TRUE &&  t[i] == 1) || (y == FALSE &&  t[i] != 1)) {
 		ncor <- ncor + 1
 	}
 }
-
 acc <- c(ncor, nts)
 cat(acc[1], ",", acc[2], sep="")
+warnings()
