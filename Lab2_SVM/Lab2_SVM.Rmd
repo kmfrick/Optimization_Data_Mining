@@ -143,7 +143,7 @@ get_svm_accuracy <- function(data_file_name, w, gamma, num_features) {
 
 classify <- function(data_file_name, w, gamma, num_features) {
   data <- read.table(data_file_name)
-  data["predict"] <- apply(df, 2, function(x) t(w) %*% as.numeric(x[1:num_features]) + gamma > 0)
+  data["predict"] <- apply(df, 1, function(x) t(w) %*% as.numeric(x[1:num_features]) + gamma > 0)
   data
 }
 ```
