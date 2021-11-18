@@ -65,7 +65,7 @@ We now run the primal and dual formulation of the SVM on the same dataset, gener
 We will then check that the primal and dual solutions are the same.
 
 ```{bash, engine.opts='-l', echo=FALSE}
-AMPL_PATH="/Applications/ampl_macos64"
+AMPL_PATH="/Applications/ampl_macos64:$HOME/ampl/ampl_linux-intel64/"
 NUM_PARAM=4
 TR_SEED=50321
 TE_SEED=12305
@@ -90,7 +90,7 @@ This is expected because the SVM, as a quadratic problem, benefits from strong d
 We will now test that this holds on a bigger dataset. Moreover, we will test the accuracy of the obtained parameter vector on a test set that is different from the training set.
 
 ```{bash, engine.opts='-l', echo=FALSE}
-AMPL_PATH="/Applications/ampl_macos64"
+AMPL_PATH="/Applications/ampl_macos64:$HOME/ampl/ampl_linux-intel64"
 PATH=${PATH}:${AMPL_PATH}
 NUM_PARAM=4
 TR_SEED=50321
@@ -139,6 +139,12 @@ get_svm_accuracy <- function(data_file_name, w, gamma, num_features) {
     }
   }
   acc <- c(ncor, nts)
+}
+
+classify <- function(data_file_name, w, gamma, num_features) {
+  data <- read.table(data_file_name)
+  data["predict"] <- apply(df, 2, function(x) t(w) %*% as.numeric(x[1:num_features]) + gamma > 0)
+  data
 }
 ```
 
@@ -191,7 +197,7 @@ We can see, even qualitatively, that a linear binary classifier is bound to be a
 We will now fit a primal and dual SVM to this dataset.
 
 ```{bash, engine.opts='-l', echo=FALSE}
-AMPL_PATH="/Applications/ampl_macos64"
+AMPL_PATH="/Applications/ampl_macos64:$HOME/ampl/ampl_linux-intel64"
 NUM_PARAM=2
 TRAIN_FNAME="randgen.dat"
 INPUT_FNAME="train.dat"
@@ -212,7 +218,7 @@ rm ${DUAL_OUT_FNAME}
 We see that, on this dataset, both formulations yield the same result as before. However, in this case, there is a  higher number of data points so the dual formulation is  slower.
 
 ```{bash, engine.opts='-l', echo=FALSE}
-AMPL_PATH="/Applications/ampl_macos64"
+AMPL_PATH="/Applications/ampl_macos64:$HOME/ampl/ampl_linux-intel64"
 PATH=${PATH}:${AMPL_PATH}
 NUM_PARAM=2
 INPUT_FNAME="train.dat"
@@ -239,6 +245,8 @@ for (nu in c(0.1, 0.5, 1, 5)) {
 
   datafile <- "randgen.dat"
   svm_acc <- get_svm_accuracy(datafile, w, gamma, 2)
+  classified <- classify(datafile, w, gamma, 2)
+  plot(classified$V1, classified$V2, col=ifelse(classified$predict, "red", "black"))
   ncor <- svm_acc[1]
   nts <- svm_acc[2]
   cat("Correctly classified", ncor, "/", nts, " points", "\n")
