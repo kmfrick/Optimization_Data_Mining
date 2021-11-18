@@ -27,11 +27,16 @@ for (i in 1:nrow(Xte)) {
 }
 y <- Xte[1:nrow(Xte), ncol(Xte)]
 ncor <- 0
+pred <- c()
 for (i in 1:nrow(Xte)) {
 	yhat <- (K[i] + gamma) > 0
+	pred[i] <- yhat
 	if ((yhat == TRUE &&  y[i] == 1) || (yhat == FALSE &&  y[i] != 1)) {
 		ncor <- ncor + 1
 	}
 }
+jpeg(file=paste("./plots/", filename, "-", filename_training, "-", sigmasq, ".jpg", sep=""), units="in", res=300, width=10, height=5)
+plot(Xte[1:nrow(Xte),1], Xte[1:nrow(Xte),2], col=ifelse(pred, "red", "black"))
+
 acc <- c(ncor, num_data)
 cat(acc[1], ",", acc[2], sep="")

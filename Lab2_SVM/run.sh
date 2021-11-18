@@ -1,6 +1,6 @@
 # Runs both models on the same dataset gridsearching for nu and sigma^2
 # Generates a CSV containing the resulting hyperplane
-millis(){  python -c "import time; print(int(time.time()*1000))"; }
+millis(){  python3 -c "import time; print(int(time.time()*1000))"; }
 
 # Config
 TRAIN_FILENAME="train.dat"
@@ -11,7 +11,7 @@ export LC_ALL=C
 # Data
 
 echo "dataset;num_features;nu;sigmasq;model;cputime;acc"
-for dataset_str in "randgen_50.dat randgen_test_50.dat 2 50" "train_50.dat test_50.dat 4 50" ; do
+for dataset_str in "randgen_50.dat randgen_test_900.dat 2 50" "train_50.dat test_50.dat 4 50" ; do
 	dataset_training=$(echo ${dataset_str}| awk '{print $1}')
 	dataset_test=$(echo ${dataset_str}		| awk '{print $2}')
 	num_features=$(echo ${dataset_str}		| awk '{print $3}')
