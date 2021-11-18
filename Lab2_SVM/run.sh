@@ -11,7 +11,7 @@ export LC_ALL=C
 # Data
 
 echo "dataset;num_features;nu;sigmasq;model;cputime;acc"
-for dataset_str in "randgen_50.dat randgen_test_900.dat 2 50" "train_50.dat test_50.dat 4 50" ; do
+for dataset_str in "randgen_50.dat randgen_test_900.dat 2 50" "train_50.dat test_50.dat 4 50" "rice_50.dat rice_test_50.dat 7 50"; do
 	dataset_training=$(echo ${dataset_str}| awk '{print $1}')
 	dataset_test=$(echo ${dataset_str}		| awk '{print $2}')
 	num_features=$(echo ${dataset_str}		| awk '{print $3}')

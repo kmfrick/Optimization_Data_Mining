@@ -164,9 +164,96 @@ cat("Correctly classified", ncor, "/", nts, " points on the training set", "\n")
 
 We can see that, on a dataset of 50 points, the trained SVM is able to correctly classify 9499 of the, or about 95%.
 
+## Rice varieties dataset
+
+We will now test the primal and dual formulations on a dataset concerning varieties of rice,  in order to ensure that, as expected, primal and dual formulations of the SVM give the same results.
+We will also test an SVM which uses a  Gaussian kernel on it, and show that it gives a worse separation than the linear classifier.
+
+
+```{bash, engine.opts='-l', echo=FALSE}
+AMPL_PATH="/Applications/ampl_macos64"
+NUM_PARAM=7
+TRAIN_FNAME="rice.dat"
+INPUT_FNAME="train.dat"
+DUAL_OUT_FNAME="dual_out.txt"
+NU=0.5
+# Remove asterisks
+sed -i ''  -e 's/\*//g'  ${TRAIN_FNAME}
+cp ${TRAIN_FNAME} ${INPUT_FNAME}
+export PATH=${PATH}:${AMPL_PATH}
+m=3809
+echo "m = ${m}, nu = ${NU}, Primal SVM:"
+time $(printf "${NUM_PARAM}\n${m}\n${NU}" | ./SVM.run | tail -n $(expr ${NUM_PARAM} + 1) > out_${TRAIN_FNAME})
+cat out_$TRAIN_FNAME
+echo "m = ${m}, nu = ${NU}, Dual SVM:"
+time $(printf "${NUM_PARAM}\n${m}\n${NU}" | time ./DualSVM.run | tail -n ${NUM_PARAM} > ${DUAL_OUT_FNAME})
+cat ${DUAL_OUT_FNAME}
+rm ${DUAL_OUT_FNAME}
+rm ${INPUT_FNAME}
+```
+
+We see that, on this dataset, both formulations yield the same result as before. However, in this case, there is a much higher number of data points so the dual formulation is much slower.
+
+```{bash, engine.opts='-l', echo=FALSE}
+AMPL_PATH="/Applications/ampl_macos64"
+PATH=${PATH}:${AMPL_PATH}
+NUM_PARAM=7
+INPUT_FNAME="train.dat"
+TRAIN_FNAME="rice.dat"
+NUM_DATA_PT=3809
+cp ${TRAIN_FNAME} ${INPUT_FNAME}
+for NU in 0.1 0.5 1 5
+do
+  echo -e "${NUM_PARAM}\n${NUM_DATA_PT}\n${NU}" | ./SVM.run | tail -n $(expr ${NUM_PARAM} + 1) > out_nu${NU}_${TRAIN_FNAME}
+done
+rm ${INPUT_FNAME}
+```
+
+```{r testsvmrice, echo=FALSE, results="markup", comment=""}
+
+for (nu in c(0.1, 0.5, 1, 5)) {
+  paramfile <- paste("out_nu", nu, "_rice.dat", sep="")
+  print(paramfile)
+  params <- parse_ampl_out(paramfile)
+  w = params$w
+  gamma = params$gamma
+  cat ("w = ", w, "\n")
+  cat("gamma = ", gamma, "\n")
+
+  datafile <- "rice.dat"
+  svm_acc <- get_svm_accuracy(datafile, w, gamma, 7)
+  ncor <- svm_acc[1]
+  nts <- svm_acc[2]
+  cat("Correctly classified", ncor, "/", nts, " points", "\n")
+}
+```
+
+We can see that, even on this dataset, accuracy is very high across values of $\nu$ when using a linear classifier. However, it drops significantly when using a Gaussian kernel, as shown in the following plot.
+
+```{r readdata, echo=FALSE}
+data <- read.csv('test.csv', header=TRUE, sep=";")
+data$nu <- as.factor(data$nu)
+data$model <- as.factor(data$model)
+levels(data$model)[levels(data$model)=="./DualSVM.run"] <- "Dual"
+levels(data$model)[levels(data$model)=="./SVM.run"] <- "Primal"
+levels(data$model)[levels(data$model)=="./GaussianSVM.run"] <- "Gaussian"
+
+divide_string <- function(str) {
+ str <- strsplit(str, ",")[[1]]
+ round(as.numeric(str[1]) / as.numeric(str[2]), 3)
+}
+data$acc <- unlist(lapply(data$acc, divide_string))
+```
+
+```{r gaussianrice, echo=FALSE}
+library(dplyr)
+boxplot(acc ~ model, data = filter(data, dataset=='rice_test_50.dat'), col=1:10, xlab="Model", ylab="Accuracy")
+```
+
+
 ## Generated dataset using R
 
-We will now test the primal and dual formulations on a dataset generated using R, in order to ensure that, as expected, primal and dual formulations of the SVM give the same results.
+We will now test the primal and dual formulations on a dataset generated using R.
 This dataset will exhibit a high degree of nonlinearity, in order to exploit the capabilities of the Gaussian kernel later. 
 
 ```{r gendataset, echo=TRUE}
@@ -232,7 +319,7 @@ done
 rm ${INPUT_FNAME}
 ```
 
-```{r testsvmrice, echo=FALSE, results="markup", comment=""}
+```{r testsvmrandgen, echo=FALSE, results="markup", comment=""}
 
 for (nu in c(0.1, 0.5, 1, 5)) {
   paramfile <- paste("out_nu", nu, "_randgen.dat", sep="")
@@ -255,32 +342,18 @@ for (nu in c(0.1, 0.5, 1, 5)) {
 
 We can see that, on this dataset, accuracy is not very high across values of $\nu$ if a linear classifier is used.
 
-Using Gauss Kernel with sigma square 0.1 we obtain the following classificator. This kernel transforms the data into a new Hilbert space that allows the SVM to classify non-linear data in the original space. We know beforehand that this dataset will be much better classified using this kernel as the data is not linearly separable.
+Using Gaussian Kernel with $\sigma^2 = 0.1$ we obtain the following classification. This kernel transforms the data into an infinite-dimensional Hilbert space that allows the SVM to classify non-linear data in the original space. We knew in advance that this dataset would have been much better classified using this kernel as the data is not linearly separable.
 
 ![Classification using Gaussian Kernel](plots/randgen_test_900.dat-randgen_50.dat-0.2.jpg)
 
 A comprehensive and quantitative comparison will be performed in the following section.
 
+
+
 # Computational study
 
 After generating a .csv file with the outputs resulting from different datasets, varying the values of $\nu$, we will now observe variations in accuracy and CPU time across different formulations.
 The accuracy tests are made on a test set which is different from that used for training, in order to evaluate the robustness of the fitted model.
-
-```{r readdata, echo=FALSE}
-data <- read.csv('test.csv', header=TRUE, sep=";")
-data$nu <- as.factor(data$nu)
-data$model <- as.factor(data$model)
-levels(data$model)[levels(data$model)=="./DualSVM.run"] <- "Dual"
-levels(data$model)[levels(data$model)=="./SVM.run"] <- "Primal"
-levels(data$model)[levels(data$model)=="./GaussianSVM.run"] <- "Gaussian"
-
-divide_string <- function(str) {
- str <- strsplit(str, ",")[[1]]
- round(as.numeric(str[1]) / as.numeric(str[2]), 3)
-}
-data$acc <- unlist(lapply(data$acc, divide_string))
-```
-
 
 ## CPU time
 
@@ -316,31 +389,36 @@ print(select(primal_cputime, dataset,num_features,cputime))
 ```
 ## Accuracy and regularization
 
-We now plot accuracy of the SVM with respect to $\nu$.
+We now plot accuracy of the SVM with respect to $\nu$, for each dataset.
 
 ```{r accnu, echo = FALSE}
-boxplot(acc ~ nu, data = data, xlab = "nu", ylab="Accuracy", col = 10:15)
+
+boxplot(acc ~ nu, data = filter(data, dataset == "test_50.dat"), xlab = "nu", ylab="Accuracy", col = 10:15, main = "gensvmdat", outline=FALSE)
+boxplot(acc ~ nu, data = filter(data, dataset == "rice_test_50.dat"), xlab = "nu", ylab="Accuracy", col = 10:15, main = "Rice varieties", outline=FALSE)
+boxplot(acc ~ nu, data = filter(data, dataset == "randgen_test_900.dat"), xlab = "nu", ylab="Accuracy", col = 10:15, main = "Generated using R", outline=FALSE)
 ```
 
-We can see that median accuracy increases with $\nu$, topping out at $\nu = 1$.
-This is expected because the $\nu$ parameter can be interpreter as an inverse regularizer of the solution, which increases generalization power if low, but underfits if too low.
-The limit value of $\nu = \infty$ translates to the hard-margin SVM, where separation is perfect.
+We can see that median accuracy generally increases with $\nu$, topping out around the middle and then descending. 
+The best values are $\nu \in \{1000, 10000\}$ for the `gensvmdat` dataset, $\nu = 10000$ for the rice varieties dataset, and $\nu \in \{0.001, 0.01, 0.1\}$ for the dataset generated using R.
+The $\nu$ parameter can be interpreter as an inverse regularizer of the solution, which increases generalization power if low, but underfits if too low.
+
+This means that the rice varieties and `gensvmdat` datasets have a very clear separation, even when differentiating between a training and test set, therefore, even the limit value of $\nu = \infty$ which translates to the hard-margin SVM, where separation is perfect but the model is wildly overfitting, is a good choice. The randomly-generated dataset, on the other hand, is 
 
 ## Gaussian kernel parameter
 
-We now aggregate data with respect to $\nu$ and search for the best parameter $\sigma^2$ for the Gaussian kernel.
+We now aggregate data with respect to $\nu$ and search for the best parameter $\sigma^2$ for the Gaussian kernel on the dataset randomly generated using R.
 
 ```{r accsigma, echo = FALSE}
 library(dplyr)
-boxplot(acc ~ sigmasq, data = filter(data, sigmasq != 'n/a'), xlab = "Sigma^2", ylab="Accuracy", col = 10:15, outline=FALSE)
+boxplot(acc ~ sigmasq, data = filter(data, (sigmasq != 'n/a') & (dataset == "randgen_test_900.dat")), xlab = "Sigma^2", ylab="Accuracy", col = 10:15, outline=FALSE)
 ```
 
-We can see that the value of $\sigma^2$ that provides the best results is $\sigma^2=0.1$.
+We can see that the value of $\sigma^2$ that provides the best results is $\sigma^2=0.01$.
 
 Finally, we plot the accuracies of the three formulations on our generated dataset.
 
 ```{r accform, echo = FALSE}
-boxplot(acc ~ model, data =data, xlab = "Model", ylab="Accuracy", col = 10:15, outline=FALSE)
+boxplot(acc ~ model, data =filter(data, dataset == "randgen_test_900.dat") , xlab = "Model", ylab="Accuracy", col = 10:15, outline=FALSE)
 ```
 
 We can clearly see that, as expected, median accuracy on a dataset which exhibits non-linear properties is much higher when using the Gaussian kernel. 
@@ -353,6 +431,7 @@ We also see that using a Gaussian kernel allows us to maintain a high level of a
 However, this penalizes explainability of the model.
 For example, we know that the dataset generated by the `gensvmdat` program separates data according to the $x_1 + x_2 + x_3 + x_4 - 2 = 0$ plane.
 This is reflected in the coefficients of the primal and dual non-kernelized SVM, but not in the learned parameters for the Gaussian kernel.
+Moreover, this outright damages accuracy in cases where the dataset is linearly separable.
 
 All in all, this works confirms that the support vector machine is a powerful and flexible tool that can be applied to cases where data is scarce, which can perform well in a high-dimensional feature space through the kernel trick and learn non-linear patterns in the data at hand.
 
