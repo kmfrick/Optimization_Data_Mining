@@ -344,11 +344,60 @@ We can see that, on this dataset, accuracy is not very high across values of $\n
 
 Using Gaussian Kernel with $\sigma^2 = 0.1$ we obtain the following classification. This kernel transforms the data into an infinite-dimensional Hilbert space that allows the SVM to classify non-linear data in the original space. We knew in advance that this dataset would have been much better classified using this kernel as the data is not linearly separable.
 
-![Classification using Gaussian Kernel](plots/randgen_test_900.dat-randgen_50.dat-0.2.jpg)
+```{bash, echo=FALSE}
+AMPL_PATH="/Applications/ampl_macos64:$HOME/ampl/ampl_linux-intel64"
+PATH=${PATH}:${AMPL_PATH}
+NUM_PARAM=2
+INPUT_FNAME="train.dat"
+TRAIN_FNAME="randgen.dat"
+NUM_DATA_PT=900
+SIGMASQ=0.01
+cp ${TRAIN_FNAME} ${INPUT_FNAME}
+NU=0.01
+echo -e "${NUM_PARAM}\n${NUM_DATA_PT}\n${SIGMASQ}\n${NU}" | ./GaussianSVM.run | tail -n $(expr ${NUM_DATA_PT} + 1) | awk -F'=' '{print $2}'> toplot_${TRAIN_FNAME}
+rm ${INPUT_FNAME}
+```
+
+```{r plotgaussian, echo=FALSE}
+filename <- "randgen.dat"
+filename_training <-"randgen.dat"
+num_features <- 2
+sigmasq <- 0.01
+gamma <- as.numeric(readLines("toplot_randgen.dat"), n=1)
+lambda <- as.vector(readLines("toplot_randgen.dat", n=900), mode="numeric")
+
+
+Xtr <- as.matrix(read.table(filename_training))
+Xte <- as.matrix(read.table(filename))
+num_data <- nrow(Xte)
+num_features_orig <- ncol(Xte) -1
+K <- 1:nrow(Xte)
+rbf <- function(x, y) exp(-norm(x - y, type='2')^2/sigmasq)
+for (i in 1:nrow(Xte)) {
+  m = 0;
+  for (j in 1:nrow(Xtr)) {
+    if (lambda[j] > 0) {
+      m <- m + lambda[j] * Xtr[j,ncol(Xtr)] * rbf(Xte[i,1:num_features_orig], Xtr[j,1:num_features_orig]);
+    }   
+  }
+  K[i] <- m;
+}
+y <- Xte[1:nrow(Xte), ncol(Xte)]
+ncor <- 0
+pred <- c() 
+for (i in 1:nrow(Xte)) {
+  yhat <- (K[i] + gamma) > 0 
+  pred[i] <- yhat
+  if ((yhat == TRUE &&  y[i] == 1) || (yhat == FALSE &&  y[i] != 1)) {
+    ncor <- ncor + 1 
+  }
+}
+plot(Xte[1:nrow(Xte),1], Xte[1:nrow(Xte),2], col=ifelse(pred, "red", "black"), xlab="x1", ylab="x2")
+
+```
+
 
 A comprehensive and quantitative comparison will be performed in the following section.
-
-
 
 # Computational study
 
