@@ -28,7 +28,7 @@ param gamma default 0;
 param idx; # Auxiliary variable
 param found_nbsv default 0;
 
-param EPS := 0.000001; # Numerical errors, so equality and inequality are defined with some slack
+param EPS := 0.0001; # Numerical errors, so equality and inequality are defined with some slack
 
 # Loop over the lambda vector and find a non-bound SV
 for {i in {1..m}} {

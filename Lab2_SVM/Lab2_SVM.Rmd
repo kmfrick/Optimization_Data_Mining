@@ -158,41 +158,66 @@ cat("Correctly classified", ncor, "/", nts, " points on the training set", "\n")
 
 We can see that, on a dataset of 50 points, the trained SVM is able to correctly classify 9499 of the, or about 95%.
 
-## Rice Varieties
+## Generated dataset using R
 
-We will now test the primal and dual formulations on a dataset concerning different kinds of rice, in order to ensure that, as expected, primal and dual formulations of the SVM give the same results.
+We will now test the primal and dual formulations on a dataset generated using R, in order to ensure that, as expected, primal and dual formulations of the SVM give the same results.
+This dataset will exhibit a high degree of nonlinearity, in order to exploit the capabilities of the Gaussian kernel later. 
+
+```{r gendataset, echo=TRUE}
+m <- 900
+set.seed(5021)
+df <- data.frame(x1 = round(rnorm(m, mean = -0.5, sd = 1), 4),
+                 x2 = round(runif(m, min = -1, max = 1), 4))
+#set radius and centers
+radius <- 0.7 
+radius_squared <- radius^2 
+center_1 <- c(-0.7,0) 
+center_2 <- c(0.7,0)
+#classify points
+df$y <- ifelse((df$x1-center_1[1])^2 + (df$x2-center_1[2])^2 < radius_squared|
+                      (df$x1-center_2[1])^2 + (df$x2-center_2[2])^2 < radius_squared,
+                    -1,1)
+write.table(df, 'randgen.dat', row.names=FALSE, col.names=FALSE)
+```
+
+We will now plot the dataset, using two different colors to distinguish the two classes.
+
+```{r plotdataset, echo=FALSE}
+plot(df$x1, df$x2, col=as.factor(df$y))
+```
+
+We can see, even qualitatively, that a linear binary classifier is bound to be a poor fit to this kind of data. 
+
+We will now fit a primal and dual SVM to this dataset.
 
 ```{bash, engine.opts='-l', echo=FALSE}
 AMPL_PATH="/Applications/ampl_macos64"
-NUM_PARAM=7
-TRAIN_FNAME="rice.dat"
+NUM_PARAM=2
+TRAIN_FNAME="randgen.dat"
 INPUT_FNAME="train.dat"
 DUAL_OUT_FNAME="dual_out.txt"
-NU=0.5
-# Remove asterisks
-sed -i ''  -e 's/\*//g'  ${TRAIN_FNAME}
+NU=0.01
 cp ${TRAIN_FNAME} ${INPUT_FNAME}
 export PATH=${PATH}:${AMPL_PATH}
-m=3809
+m=900
 echo "m = ${m}, nu = ${NU}, Primal SVM:"
 time $(printf "${NUM_PARAM}\n${m}\n${NU}" | ./SVM.run | tail -n $(expr ${NUM_PARAM} + 1) > out_${TRAIN_FNAME})
 cat out_$TRAIN_FNAME
 echo "m = ${m}, nu = ${NU}, Dual SVM:"
-time $(printf "${NUM_PARAM}\n${m}\n${NU}" | time ./DualSVM.run | tail -n ${NUM_PARAM} > ${DUAL_OUT_FNAME})
+time $(printf "${NUM_PARAM}\n${m}\n${NU}" | time ./DualSVM.run | tail -n $(expr ${NUM_PARAM} + 1) > ${DUAL_OUT_FNAME})
 cat ${DUAL_OUT_FNAME}
 rm ${DUAL_OUT_FNAME}
-rm ${INPUT_FNAME}
 ```
 
-We see that, on this dataset, both formulations yield the same result as before. However, in this case, there is a much higher number of data points so the dual formulation is much slower.
+We see that, on this dataset, both formulations yield the same result as before. However, in this case, there is a  higher number of data points so the dual formulation is  slower.
 
 ```{bash, engine.opts='-l', echo=FALSE}
 AMPL_PATH="/Applications/ampl_macos64"
 PATH=${PATH}:${AMPL_PATH}
-NUM_PARAM=7
+NUM_PARAM=2
 INPUT_FNAME="train.dat"
-TRAIN_FNAME="rice.dat"
-NUM_DATA_PT=3809
+TRAIN_FNAME="randgen.dat"
+NUM_DATA_PT=900
 cp ${TRAIN_FNAME} ${INPUT_FNAME}
 for NU in 0.1 0.5 1 5
 do
@@ -204,7 +229,7 @@ rm ${INPUT_FNAME}
 ```{r testsvmrice, echo=FALSE, results="markup", comment=""}
 
 for (nu in c(0.1, 0.5, 1, 5)) {
-  paramfile <- paste("out_nu", nu, "_rice.dat", sep="")
+  paramfile <- paste("out_nu", nu, "_randgen.dat", sep="")
   print(paramfile)
   params <- parse_ampl_out(paramfile)
   w = params$w
@@ -212,15 +237,15 @@ for (nu in c(0.1, 0.5, 1, 5)) {
   cat ("w = ", w, "\n")
   cat("gamma = ", gamma, "\n")
 
-  datafile <- "rice.dat"
-  svm_acc <- get_svm_accuracy(datafile, w, gamma, 7)
+  datafile <- "randgen.dat"
+  svm_acc <- get_svm_accuracy(datafile, w, gamma, 2)
   ncor <- svm_acc[1]
   nts <- svm_acc[2]
   cat("Correctly classified", ncor, "/", nts, " points", "\n")
 }
 ```
 
-We can see that, even on this dataset, accuracy is very high across values of $\nu$. A comprehensive and quantitative comparison will be performed in the following section.
+We can see that, on this dataset, accuracy is not very high across values of $\nu$ if a linear classifier is used. A comprehensive and quantitative comparison will be performed in the following section.
 
 # Computational study
 
@@ -230,16 +255,17 @@ The accuracy tests are made on a test set which is different from that used for 
 ```{r readdata, echo=FALSE}
 data <- read.csv('test.csv', header=TRUE, sep=";")
 data$nu <- as.factor(data$nu)
+data$model <- as.factor(data$model)
 levels(data$model)[levels(data$model)=="./DualSVM.run"] <- "Dual"
 levels(data$model)[levels(data$model)=="./SVM.run"] <- "Primal"
+levels(data$model)[levels(data$model)=="./GaussianSVM.run"] <- "Gaussian"
+
 divide_string <- function(str) {
  str <- strsplit(str, ",")[[1]]
  round(as.numeric(str[1]) / as.numeric(str[2]), 3)
 }
 data$acc <- unlist(lapply(data$acc, divide_string))
 ```
-
-
 
 
 ## CPU time
@@ -249,13 +275,13 @@ First, we plot CPU time with respect to model formulation, primal and dual.
 ```{r cputime, echo = FALSE}
 library(dplyr)
 cputime_data <- read.csv('test_cputime.csv', header=TRUE, sep=";")
-cputime_data$cpusec <- as.integer(cputime_data$cpusec)
+cputime_data$cputime <- as.integer(cputime_data$cputime)
 cputime_data$num_features <- as.factor(cputime_data$num_features)
 cputime_data$model <- as.factor(cputime_data$model)
 levels(cputime_data$model)[levels(cputime_data$model)=="./DualSVM.run"] <- "Dual"
 levels(cputime_data$model)[levels(cputime_data$model)=="./SVM.run"] <- "Primal"
 dual_cputime <- filter(cputime_data, model=='Dual')
-boxplot(cpusec ~ model, data = cputime_data, xlab = "Model", ylab="CPU time (s)", col = 10:15, outline=FALSE)
+boxplot(cputime ~ model, data = cputime_data, xlab = "Model", ylab="CPU time (ms)", col = 10:15, outline=FALSE)
 ```
 
 We can see that the dual formulation is much slower in general, even on a small dataset. This is expected because, on both datasets, $n >> d$ and the dual formulation is nonparametric, i.e. scales with dataset size and not parameter count.
@@ -263,26 +289,26 @@ We can see that the dual formulation is much slower in general, even on a small 
 We now plot CPU time of the dual formulation with respect to dataset size.
 
 ```{r cputimedual, echo = FALSE}
-boxplot(cpusec ~ num_features, data = dual_cputime, col =10:15, ylab="CPU time(s)", xlab="Number of data points")
+boxplot(cputime ~ num_features, data = dual_cputime, col =10:15, ylab="CPU time(ms)", xlab="Number of data points")
 ```
 
 We can see that, as expected, the dual formulation scales badly with dataset size, matching the expected curve of $O(n^3)$.
 
-Finally, we print CPU time of the primal formulation with respect to dataset size. A boxplot is hardly significant since, as we can see, CPU time is either 1 second or lower. This also matches what is expected from the theoretical analysis, as the primal formulation does not scale with data set size.
+Finally, we print CPU time of the primal formulation with respect to dataset size. A boxplot is hardly significant since, as we can see, CPU time is lower than 1 second. This also matches what is expected from the theoretical analysis, as the primal formulation does not scale with data set size.
 
 ```{r cputimeprim, echo = FALSE}
 primal_cputime <- filter(cputime_data, model=='Primal')
-print(select(primal_cputime, dataset,num_features,cpusec))
+print(select(primal_cputime, dataset,num_features,cputime))
 ```
 ## Accuracy and regularization
 
-We now plot accuracy with respect to $\nu$.
+We now plot accuracy of the SVM with respect to $\nu$.
 
 ```{r accnu, echo = FALSE}
 boxplot(acc ~ nu, data = data, xlab = "nu", ylab="Accuracy", col = 10:15)
 ```
 
-We can see that accuracy increases with $\nu$, decreasing around $\nu = 0.1$ and topping out at $\nu = 10$, then decreasing again.
+We can see that median accuracy increases with $\nu$, topping out at $\nu = 1$.
 This is expected because the $\nu$ parameter can be interpreter as an inverse regularizer of the solution, which increases generalization power if low, but underfits if too low.
 The limit value of $\nu = \infty$ translates to the hard-margin SVM, where separation is perfect.
 
@@ -295,11 +321,21 @@ library(dplyr)
 boxplot(acc ~ sigmasq, data = filter(data, sigmasq != 'n/a'), xlab = "Sigma^2", ylab="Accuracy", col = 10:15, outline=FALSE)
 ```
 
+We can see that the value of $\sigma^2$ that provides the best results is $\sigma^2=0.1$.
+
+Finally, we plot the accuracies of the three formulations on our generated dataset.
+
+```{r accform, echo = FALSE}
+boxplot(acc ~ model, data =data, xlab = "Model", ylab="Accuracy", col = 10:15, outline=FALSE)
+```
+
+We can clearly see that, as expected, median accuracy on a dataset which exhibits non-linear properties is much higher when using the Gaussian kernel. 
+
 # Conclusions
 
 Our implementations confirm the theoretical properties of the support vector machine, and prove that both the primal and dual formulation are able to obtain very high accuracies even off the training set if the cost parameter $\nu$ is well tuned.
 
-We also see that using a Gaussian kernel allows us to have perfect accuracy, again even using a test set different from the one the SVM is trained on.
+We also see that using a Gaussian kernel allows us to maintain a high level of accuracy in the case where the dataset at hand presents nonlinearities. Again, this holds even using a test set different from the one the SVM is trained on.
 However, this penalizes explainability of the model.
 For example, we know that the dataset generated by the `gensvmdat` program separates data according to the $x_1 + x_2 + x_3 + x_4 - 2 = 0$ plane.
 This is reflected in the coefficients of the primal and dual non-kernelized SVM, but not in the learned parameters for the Gaussian kernel.
