@@ -1,5 +1,5 @@
 #!/usr/bin/env ampl
-model GaussianSVM.mod;
+model GaussianSVM0G.mod;
 printf "Enter number of features n: ";
 read n <-;
 printf "Enter number of data points m: ";
@@ -30,26 +30,12 @@ read nu <-;
 
 solve;
 
+# Gamma set at 0 when using kernels
+# See Poggio et al. 2001
 param gamma default 0;
-param EPS := 0.0001;
-param idx;
-param found_nbsv default 0;
-# Loop over the lambda vector and find a non-bound SV
-for {i in {1..m}} {
-  printf "lambda_%d = %lf\n", i, lambda[i];
-  if lambda[i] > EPS and lambda[i] < (nu - EPS) then {
-    let idx := i;
-    let found_nbsv := 1;
-    break;
-  }
-}
 
-if found_nbsv > 0 then {
-  let gamma := 1 / y[idx] - sum{i in 1..m} lambda[i] * K[idx, i]
-}
 printf "gamma = %lf\n", gamma;
 
 for {j in 1..m} {
 	printf "lambda_%d = %lf\n", j, lambda[j]
 }
-

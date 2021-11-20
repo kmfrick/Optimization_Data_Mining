@@ -18,7 +18,7 @@ for dataset_str in "randgen_50.dat randgen_test_900.dat 2 50" "train_50.dat test
 	num_data=$(echo ${dataset_str}				| awk '{print $4}')
 
 	cp "${dataset_training}" "${TRAIN_FILENAME}"
-	model="./GaussianSVM.run"
+	for model in "./GaussianSVM.run" "./GaussianSVM0G.run"; do
 	for sigmasq in 0.001 0.01  0.1 0.2 0.5 1  5 10  100 1000; do
 		for nu in 0 0.001 0.01 0.1 0.5 1 5 10 100; do
 			res1=$(millis)
@@ -29,6 +29,7 @@ for dataset_str in "randgen_50.dat randgen_test_900.dat 2 50" "train_50.dat test
 			echo "$dataset_test;${num_data};$nu;${sigmasq};$model;$(echo "$res2 - $res1" | bc);$acc"
 		done;
 	done
+done
 
 	for model in ./SVM.run ./DualSVM.run; do
 		for nu in 0 0.001 0.01 0.1 0.5 1 5 10 100 1000 10000; do

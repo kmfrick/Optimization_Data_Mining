@@ -6,9 +6,6 @@ sigmasq <- as.numeric(args[3])
 num_features <- as.numeric(args[4])
 gamma <- as.numeric(args[5])
 lambda <- as.vector(args[6:length(args)], mode="numeric")
-if (length(lambda) != num_features) {
-	write("OHNO\n", stderr())
-}
 
 Xtr <- as.matrix(read.table(filename_training))
 Xte <- as.matrix(read.table(filename))
@@ -40,3 +37,4 @@ plot(Xte[1:nrow(Xte),1], Xte[1:nrow(Xte),2], col=ifelse(pred, "red", "black"))
 
 acc <- c(ncor, num_data)
 cat(acc[1], ",", acc[2], sep="")
+

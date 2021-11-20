@@ -41,11 +41,9 @@ This results in the following AMPL code.
 cat(readLines("DualSVM.run"),sep="\n")
 ```
 
-Finally, we implement the dual formulation using the Gaussian kernel, substituting the dot products between data points with the kernel function $k(\mathbf{x}, \mathbf{x'}) = e^\frac{-\|\mathbf{x} - \mathbf{x'}\|}{\sigma^2}$.
+Finally, we implement the dual formulation using the RBF kernel, substituting the dot products between data points with the kernel function $k(\mathbf{x}, \mathbf{x'}) = e^\frac{-\|\mathbf{x} - \mathbf{x'}\|}{\sigma^2}$.
 
 In order to optimize the computation, we pre-compute the kernel matrix $K : (K_{ij}) = k(\mathbf{x}_i, \mathbf{x}_j)$.
-
-Finally, after reviewing the relevant literature (@poggio_b_2002) we set the gamma parameter to zero, resulting in the following cod for the model
 
 ```{r svmgaussian, echo=FALSE, results="markup", comment=""}
 cat(readLines("GaussianSVM.mod"),sep="\n")
@@ -162,12 +160,12 @@ nts <- svm_acc[2]
 cat("Correctly classified", ncor, "/", nts, " points on the training set", "\n")
 ```
 
-We can see that, on a dataset of 50 points, the trained SVM is able to correctly classify 9499 of the, or about 95%.
+We can see that, on a dataset of 50 points, the trained SVM is able to correctly classify 45 of the, for a 90% accuracy.
 
 ## Rice varieties dataset
 
 We will now test the primal and dual formulations on a dataset concerning varieties of rice,  in order to ensure that, as expected, primal and dual formulations of the SVM give the same results.
-We will also test an SVM which uses a  Gaussian kernel on it, and show that it gives a worse separation than the linear classifier.
+We will also test an SVM which uses a  RBF kernel on it, and show that it gives a worse separation than the linear classifier.
 
 
 ```{bash, engine.opts='-l', echo=FALSE}
@@ -189,7 +187,6 @@ echo "m = ${m}, nu = ${NU}, Dual SVM:"
 time $(printf "${NUM_PARAM}\n${m}\n${NU}" | time ./DualSVM.run | tail -n ${NUM_PARAM} > ${DUAL_OUT_FNAME})
 cat ${DUAL_OUT_FNAME}
 rm ${DUAL_OUT_FNAME}
-rm ${INPUT_FNAME}
 ```
 
 We see that, on this dataset, both formulations yield the same result as before. However, in this case, there is a much higher number of data points so the dual formulation is much slower.
@@ -228,7 +225,7 @@ for (nu in c(0.1, 0.5, 1, 5)) {
 }
 ```
 
-We can see that, even on this dataset, accuracy is very high across values of $\nu$ when using a linear classifier. However, it drops significantly when using a Gaussian kernel, as shown in the following plot.
+We can see that, even on this dataset, accuracy is very high across values of $\nu$ when using a linear classifier. However, it drops significantly when using a RBF kernel, as shown in the following plot.
 
 ```{r readdata, echo=FALSE}
 data <- read.csv('test.csv', header=TRUE, sep=";")
@@ -236,7 +233,9 @@ data$nu <- as.factor(data$nu)
 data$model <- as.factor(data$model)
 levels(data$model)[levels(data$model)=="./DualSVM.run"] <- "Dual"
 levels(data$model)[levels(data$model)=="./SVM.run"] <- "Primal"
-levels(data$model)[levels(data$model)=="./GaussianSVM.run"] <- "Gaussian"
+levels(data$model)[levels(data$model)=="./GaussianSVM.run"] <- "RBF"
+levels(data$model)[levels(data$model)=="./GaussianSVM0G.run"] <- "RBF (no gamma)"
+
 
 divide_string <- function(str) {
  str <- strsplit(str, ",")[[1]]
@@ -254,7 +253,7 @@ boxplot(acc ~ model, data = filter(data, dataset=='rice_test_50.dat'), col=1:10,
 ## Generated dataset using R
 
 We will now test the primal and dual formulations on a dataset generated using R.
-This dataset will exhibit a high degree of nonlinearity, in order to exploit the capabilities of the Gaussian kernel later. 
+This dataset will exhibit a high degree of nonlinearity, in order to exploit the capabilities of the RBF kernel later. 
 
 ```{r gendataset, echo=TRUE}
 m <- 900
@@ -342,7 +341,7 @@ for (nu in c(0.1, 0.5, 1, 5)) {
 
 We can see that, on this dataset, accuracy is not very high across values of $\nu$ if a linear classifier is used.
 
-Using Gaussian Kernel with $\sigma^2 = 0.1$ we obtain the following classification. This kernel transforms the data into an infinite-dimensional Hilbert space that allows the SVM to classify non-linear data in the original space. We knew in advance that this dataset would have been much better classified using this kernel as the data is not linearly separable.
+Using RBF Kernel with $\sigma^2 = 0.1$ and removing the $\gamma$ parameter from the model we obtain the following classification. This kernel transforms the data into an infinite-dimensional Hilbert space that allows the SVM to classify non-linear data in the original space. We knew in advance that this dataset would have been much better classified using this kernel as the data is not linearly separable. Moreover, relevant literature such as @poggio_b_2002 suggests removing the $\gamma$ constraint from the model when using kernels often works well in practice for increasing accuracy.
 
 ```{bash, echo=FALSE}
 AMPL_PATH="/Applications/ampl_macos64:$HOME/ampl/ampl_linux-intel64"
@@ -354,7 +353,7 @@ NUM_DATA_PT=900
 SIGMASQ=0.01
 cp ${TRAIN_FNAME} ${INPUT_FNAME}
 NU=0.01
-echo -e "${NUM_PARAM}\n${NUM_DATA_PT}\n${SIGMASQ}\n${NU}" | ./GaussianSVM.run | tail -n $(expr ${NUM_DATA_PT} + 1) | awk -F'=' '{print $2}'> toplot_${TRAIN_FNAME}
+echo -e "${NUM_PARAM}\n${NUM_DATA_PT}\n${SIGMASQ}\n${NU}" | ./GaussianSVM0G.run | tail -n $(expr ${NUM_DATA_PT} + 1) | awk -F'=' '{print $2}'> toplot_${TRAIN_FNAME}
 rm ${INPUT_FNAME}
 ```
 
@@ -448,21 +447,21 @@ boxplot(acc ~ nu, data = filter(data, dataset == "randgen_test_900.dat"), xlab =
 ```
 
 We can see that median accuracy generally increases with $\nu$, topping out around the middle and then descending. 
-The best values are $\nu \in \{1000, 10000\}$ for the `gensvmdat` dataset, $\nu = 10000$ for the rice varieties dataset, and $\nu \in \{0.001, 0.01, 0.1\}$ for the dataset generated using R.
+The best values are $\nu \in \{1000, 10000\}$ for the `gensvmdat` dataset, $\nu = 10000$ for the rice varieties dataset, and $\nu \in \{10, 100\}$ for the dataset generated using R.
 The $\nu$ parameter can be interpreter as an inverse regularizer of the solution, which increases generalization power if low, but underfits if too low.
 
-This means that the rice varieties and `gensvmdat` datasets have a very clear separation, even when differentiating between a training and test set, therefore, even the limit value of $\nu = \infty$ which translates to the hard-margin SVM, where separation is perfect but the model is wildly overfitting, is a good choice. The randomly-generated dataset, on the other hand, is 
+This means that the rice varieties and `gensvmdat` datasets have a very clear separation, even when differentiating between a training and test set, therefore, even the limit value of $\nu = \infty$ which translates to the hard-margin SVM, where separation is perfect but the model is wildly overfitting, is a good choice. The randomly-generated dataset, on the other hand, is more complex and requires careful regularization of the fitted model.
 
-## Gaussian kernel parameter
+## RBF kernel parameter
 
-We now aggregate data with respect to $\nu$ and search for the best parameter $\sigma^2$ for the Gaussian kernel on the dataset randomly generated using R.
+We now aggregate data with respect to $\nu$ and search for the best parameter $\sigma^2$ for the RBF kernel on the dataset randomly generated using R.
 
 ```{r accsigma, echo = FALSE}
 library(dplyr)
 boxplot(acc ~ sigmasq, data = filter(data, (sigmasq != 'n/a') & (dataset == "randgen_test_900.dat")), xlab = "Sigma^2", ylab="Accuracy", col = 10:15, outline=FALSE)
 ```
 
-We can see that the value of $\sigma^2$ that provides the best results is $\sigma^2=0.01$.
+We can see that the value of $\sigma^2$ that provides the best results is $\sigma^2=0.1$.
 
 Finally, we plot the accuracies of the three formulations on our generated dataset.
 
@@ -470,16 +469,16 @@ Finally, we plot the accuracies of the three formulations on our generated datas
 boxplot(acc ~ model, data =filter(data, dataset == "randgen_test_900.dat") , xlab = "Model", ylab="Accuracy", col = 10:15, outline=FALSE)
 ```
 
-We can clearly see that, as expected, median accuracy on a dataset which exhibits non-linear properties is much higher when using the Gaussian kernel. 
+We can clearly see that, as expected, median accuracy on a dataset which exhibits non-linear properties is much higher when using the RBF kernel with the $\gamma$ parameter removed. Interestingly, leaving $\gamma$ in results in much lower accuracy. 
 
 # Conclusions
 
 Our implementations confirm the theoretical properties of the support vector machine, and prove that both the primal and dual formulation are able to obtain very high accuracies even off the training set if the cost parameter $\nu$ is well tuned.
 
-We also see that using a Gaussian kernel allows us to maintain a high level of accuracy in the case where the dataset at hand presents nonlinearities. Again, this holds even using a test set different from the one the SVM is trained on.
+We also see that using a RBF kernel allows us to maintain a high level of accuracy in the case where the dataset at hand presents nonlinearities. Again, this holds even using a test set different from the one the SVM is trained on.
 However, this penalizes explainability of the model.
 For example, we know that the dataset generated by the `gensvmdat` program separates data according to the $x_1 + x_2 + x_3 + x_4 - 2 = 0$ plane.
-This is reflected in the coefficients of the primal and dual non-kernelized SVM, but not in the learned parameters for the Gaussian kernel.
+This is reflected in the coefficients of the primal and dual non-kernelized SVM, but not in the learned parameters for the RBF kernel.
 Moreover, this outright damages accuracy in cases where the dataset is linearly separable.
 
 All in all, this works confirms that the support vector machine is a powerful and flexible tool that can be applied to cases where data is scarce, which can perform well in a high-dimensional feature space through the kernel trick and learn non-linear patterns in the data at hand.
