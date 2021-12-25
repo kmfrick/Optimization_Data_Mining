@@ -26,6 +26,11 @@ header-includes:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+library(caret)
+library(GGally)
+library(network)
+library(sna)
+library(ggplot2)
 ```
 
 <!-- 
@@ -76,12 +81,15 @@ All of these parameters are real-valued and continuous. We remove parameter 3 be
 
 The $A$ matrix has therefore a final size of $210 \times 6$.
 
-We read the data file, remove the third and last column, as the last column corresponds to the correct cluster, then compute the distance matrix and write it to a file to be read by AMPL:
+We read the data file, remove the third and last column, as the last column corresponds to the correct cluster, then compute the distance matrix and write it to a file to be read by AMPL. We also perform principal component analysis to plot the dataset.
 
 ```{r}
 seeds <- read.table('seeds.txt')
-seeds.dist <- as.matrix(dist(seeds[, -c(3, 8)]))
+seeds.clean <- seeds[,-c(3, 8)]
+seeds.dist <- as.matrix(dist(seeds.clean))
 write.table(seeds.dist, file='seeds_dist.dat', row.names = FALSE, col.names = FALSE)
+seeds.pca <- princomp(seeds.clean)
+plot(seeds.pca$scores[,1:2])
 ```
 
 # Modeling the CMP in AMPL
@@ -153,42 +161,52 @@ CPLEX 20.1.0.0: optimal integer solution; objective 314.2081702
 
 After running the file, we check which points correspond to the cluster medians:
 ```{r}
-seeds.out <- read.table('seeds_out.dat')
-cluster.medians <- c()
-for (i in 1:210) { 
-  if (any(seeds.out[,i] != 0)) { 
-    cluster.medians <- c(cluster.medians, i)
-  } 
+get.cluster.medians <- function(outf) {
+  
+  ampl.cluster.medians <- c()
+  for (i in 1:nrow(outf)) { 
+    if (any(outf[,i] != 0)) { 
+      ampl.cluster.medians <- c(ampl.cluster.medians, i)
+    } 
+  }
+  ampl.cluster.medians
 }
-print(cluster.medians)
+seeds.out <- read.table('seeds_out.dat')
+seeds.ampl.cluster.medians <- get.cluster.medians(seeds.out)
+cat("Cluster medians are: ", seeds.ampl.cluster.medians, "\n")
 ```
 
 We check which varieties do those points belong to in the original dataset:
 
 ```{r}
-seeds[cluster.medians,]
+print(seeds[seeds.ampl.cluster.medians,])
 ```
 
 Since we have ground truth labels, we can print the confusion matrix.
 
 ```{r}
-library(caret)
-k <- 3
-seeds.predicted.clust <- as.data.frame(matrix(0, nrow = nrow(seeds), ncol = 1))
-i <- 1
-for (col in seeds.out[,cluster.medians]) {
-  clust.i <- which(col == 1)
-  seeds.predicted.clust[clust.i,1] <- i
-  i <- i + 1
+get.confusion.matrix<- function(true.clust, out, k) {
+  predicted.clust <- as.data.frame(matrix(0, nrow = nrow(out), ncol = 1))
+  ampl.cluster.medians <- get.cluster.medians(out)
+  i <- 1
+  for (col in out[,ampl.cluster.medians]) {
+    clust.i <- which(col == 1)
+    predicted.clust[clust.i,1] <- i
+    i <- i + 1
+  }
+  predicted.clust
+  confusionMatrix(as.factor(predicted.clust[,1]), true.clust)
 }
-print(confusionMatrix(as.factor(seeds.predicted.clust[,1]), as.factor(seeds[,8])))
+k <- 3
+seeds.confusion.matrix <- get.confusion.matrix(as.factor(seeds[,8]), seeds.out, k)
+print(seeds.confusion.matrix)
 ```
 
 The value of the objective function is:
 
 ```{r}
 dx <- seeds.out * seeds.dist
-print(sum(dx))
+cat("sum(dij * xij) = ", sum(dx))
 ```
 
 Which matches what is given by AMPL.
@@ -198,8 +216,7 @@ Which matches what is given by AMPL.
 We implement a union-find disjoint set data structure (UFDS). We use path compression to keep the tree short and always attach in such a way as to keep the tree short, using the rank of a node to choose which attachment point to use.
 
 ```{r}
-m <- nrow(seeds)
-reset.ufds <- function() {
+reset.ufds <- function(m) {
   ufds.rank <<- rep(0, m)
   p <<- as.numeric(1:m)
 }
@@ -236,126 +253,166 @@ union.set <- function(i, j) {
 We implement Kruskal's algorithm to get the minimum spanning tree.
 
 ```{r}
-edge.list <- as.data.frame(matrix(0, nrow = m * m - m, ncol = 3))
-names(edge.list) <- c('from', 'to', 'dist')
-cnt <- 1
-for (i in 1:m) {
-  for (j in 1:m) {
-    if (j != i) {
-      edge.list[cnt,] <- c(i, j, seeds.dist[i, j])
-      cnt <- cnt + 1
+gen.edge.list <- function(datamat) {
+  dist.matrix <- as.matrix(dist(datamat))
+  m <- nrow(dist.matrix)
+  edge.list <- as.data.frame(matrix(0, nrow = m * m - m, ncol = 3))
+  names(edge.list) <- c('from', 'to', 'dist')
+  cnt <- 1
+  for (i in 1:m) {
+    for (j in 1:m) {
+      if (j != i) {
+        edge.list[cnt,] <- c(i, j, dist.matrix[i, j])
+        cnt <- cnt + 1
+      }
     }
   }
+  edge.list
 }
-cnt <- cnt - 1
+seeds.edge.list <- gen.edge.list(seeds.clean)
 ```
 
 ```{r}
-mst.cost <- 0
-reset.ufds()
-edge.list.ordered <- edge.list[order(edge.list$dist), ]
-new.edge.list <- data.frame(row.names = names(edge.list))
-for (i in 1:cnt) {
-  u <- edge.list.ordered[i,]
-  if (!is.same.set(u$to, u$from)) {
-    mst.cost <- mst.cost + u$dist
-    union.set(u$to, u$from)
-    new.edge.list <- rbind(new.edge.list, u)
-  } 
+kruskal <- function(edge.list, m) {
+  mst.cost <- 0
+  reset.ufds(m)
+  edge.list.ordered <- edge.list[order(edge.list$dist), ]
+  mst.edge.list <- data.frame(row.names = names(edge.list))
+  for (i in 1:nrow(edge.list)) {
+    u <- edge.list.ordered[i,]
+    if (!is.same.set(u$to, u$from)) {
+      mst.cost <- mst.cost + u$dist
+      union.set(u$to, u$from)
+      mst.edge.list <- rbind(mst.edge.list, u)
+    } 
+  }
+  cat("MST cost = ", mst.cost)
+  mst.edge.list
 }
-cat("MST cost = ", mst.cost)
+m <- nrow(seeds.dist)
+seeds.mst.edge.list <- kruskal(seeds.edge.list, m)
 ```
 
 Now, we remove the $k - 1 = 2$ edges with largest weight in order to get three separate trees, which will be our clusters.
 
 ```{r}
-n.edges <- nrow(new.edge.list)
-clust.edge.list <- new.edge.list[1:(n.edges - (k - 1)),]
+k <- 3
+n.edges <- nrow(seeds.mst.edge.list)
+seeds.clust.mst.edge.list <- seeds.mst.edge.list[1:(n.edges - (k - 1)),]
 ```
 
 We now run a connected components search to color the nodes according to their cluster.
 
 ```{r}
-dist.mst <- matrix(0, nrow = m, ncol = m)
-child.list.mst <- vector("list", m)
-for (i in 1:m) {
-  child.list.mst[[m]] <- vector()
+gen.dist.mst <- function(clust.edge.list, m) {
+  dist.mst <- matrix(0, nrow = m, ncol = m)
+  for (i in 1:nrow(clust.edge.list)) {
+    r <- clust.edge.list[i,]
+    dist.mst[r$from, r$to] <- r$dist
+    dist.mst[r$to, r$from] <- r$dist
+  }
+  dist.mst
 }
-for (i in 1:nrow(clust.edge.list)) {
-  r <- clust.edge.list[i,]
-  dist.mst[r$from, r$to] <- r$dist
-  dist.mst[r$to, r$from] <- r$dist
-  child.list.mst[[r$from]] <- c(child.list.mst[[r$from]] , r$to)
-  child.list.mst[[r$to]] <- c(child.list.mst[[r$to]] , r$from)
-
+gen.child.list.mst <- function(clust.edge.list, m) {
+  child.list.mst <- vector("list", m)
+  for (i in 1:m) {
+    child.list.mst[[m]] <- vector()
+  }
+  for (i in 1:nrow(clust.edge.list)) {
+    r <- clust.edge.list[i,]
+    child.list.mst[[r$from]] <- c(child.list.mst[[r$from]] , r$to)
+    child.list.mst[[r$to]] <- c(child.list.mst[[r$to]] , r$from)
+  }
+  child.list.mst
 }
 
-visited <- rep(FALSE, m)
-clust.mst <- rep(0, m)
-dfs <- function(u, clust) {
-  if (visited[u]) {
-    return()
-  } else {
-    visited[u] <<- TRUE
-    clust.mst[u] <<- clust
-    for (v in child.list.mst[[u]]) {
-      dfs(v, clust)
+mst.cluster <- function(child.list.mst, m) {
+  visited <<- rep(FALSE, m)
+  clust.mst <<- rep(0, m)
+  dfs <- function(u, clust) {
+    if (visited[u]) {
+      return()
+    } else {
+      visited[u] <<- TRUE
+      clust.mst[u] <<- clust
+      for (v in child.list.mst[[u]]) {
+        dfs(v, clust)
+      }
     }
   }
-}
-for (clust in 1:k) {
-  dfs.started <- FALSE
-  for (u in 1:m) {
-    if (!visited[u]) {
-      dfs.started <- TRUE
-      dfs(u, clust)
-    }
-    if (dfs.started) {
-      break
+  for (clust in 1:k) {
+    dfs.started <- FALSE
+    for (u in 1:m) {
+      if (!visited[u]) {
+        dfs.started <- TRUE
+        dfs(u, clust)
+      }
+      if (dfs.started) {
+        break
+      }
     }
   }
+  clust.mst
 }
 
-palette <- c("red", "green", "blue")
-colors <- c()
-for (i in 1:m) {
-  colors <- c(colors, palette[clust.mst[i]])
+gen.palette <- function(mst.clust, m) {
+  palette <- c("red", "green", "blue", "magenta", "black", "grey")
+  colors <- c()
+  for (i in 1:m) {
+    colors <- c(colors, palette[mst.clust[i]])
+  }
+  colors
 }
+
+seeds.dist.mst <- gen.dist.mst(seeds.clust.mst.edge.list, m)
+seeds.child.list.mst <- gen.child.list.mst(seeds.clust.mst.edge.list, m)
+seeds.mst.clust <- mst.cluster(seeds.child.list.mst, m)
+seeds.mst.colors <- gen.palette(seeds.mst.clust, m)
+
 ```
 We now plot the resulting MST.
 
 ```{r}
-library(GGally)
-library(network)
-library(sna)
-library(ggplot2)
-ggnet2(dist.mst, node.size = 3, node.color = colors, directed=FALSE)
+ggnet2(seeds.dist.mst, node.size = 3, node.color = seeds.mst.colors, directed=FALSE)
 ```
 
 We now calculate the median point for each cluster as $\arg\min\limits_{j \in C} \sum\limits_{i \in C} d_{ij}$.
 
 ```{r}
-dist.clust.mst <- vector("numeric", k)
-median.node <- vector("numeric", k)
-for (cur.clust in 1:k) {
-  nodes.in.clust <- which(clust.mst == cur.clust)
-  min.sum.dist <- sum(seeds.dist)
-  for (u in nodes.in.clust) {
-    sum.dist <- sum(seeds.dist[u,nodes.in.clust])
-    if (sum.dist < min.sum.dist) {
-      median.node[cur.clust] <- u
-      min.sum.dist <- sum.dist
-      dist.clust.mst[cur.clust] <- min.sum.dist
+get.mst.median.nodes <- function(clust.mst, orig.dist, k) {
+  dist.clust.mst <- vector("numeric", k)
+  median.node <- vector("numeric", k)
+  for (cur.clust in 1:k) {
+    nodes.in.clust <- which(clust.mst == cur.clust)
+    min.sum.dist <- sum(orig.dist)
+    for (u in nodes.in.clust) {
+      sum.dist <- sum(orig.dist[u,nodes.in.clust])
+      if (sum.dist < min.sum.dist) {
+        median.node[cur.clust] <- u
+        min.sum.dist <- sum.dist
+        dist.clust.mst[cur.clust] <- min.sum.dist
+      }
     }
   }
+  median.node
 }
-print(median.node)
+seeds.mst.median.nodes <- get.mst.median.nodes(seeds.mst.clust, seeds.dist, k)
 ```
 
 We now print the value of the objective function as calculated with the MST.
 
 ```{r}
-print(sum(dist.clust.mst))
+get.mst.median.nodes.dist <- function(mst.median.nodes, mst.clust, orig.dist) {
+  mst.median.nodes.dist <- rep(0, length(mst.median.nodes))
+  for (i in 1:nrow(orig.dist)) {
+    cur.cluster <- mst.clust[i]
+    cur.median <- mst.median.nodes[cur.cluster]
+    mst.median.nodes.dist[cur.cluster] <- mst.median.nodes.dist[cur.cluster] + orig.dist[i, cur.median]
+  }
+  mst.median.nodes.dist
+}
+seeds.mst.median.nodes.dist <- get.mst.median.nodes.dist(seeds.mst.median.nodes, seeds.mst.clust, seeds.dist)
+cat("MST Objective:", sum(seeds.mst.median.nodes.dist), "\n")
 ```
 
 We can see that this value is slightly more than double what is obtained by solving the optimization problem with AMPL.
@@ -364,11 +421,71 @@ Finally, we print the confusion matrix of the clusters obtained with the MST.
 
 ```{r}
 seeds.predicted.clust.mst <- as.data.frame(clust.mst)
-print(confusionMatrix(as.factor(seeds.predicted.clust.mst[,1]), as.factor(seeds[,8])))
+
+true.clust <- seeds[,8]
+true.clust <- as.factor(true.clust)
+levels(true.clust) <- true.clust[seeds.mst.median.nodes]
+
+print(confusionMatrix(as.factor(seeds.predicted.clust.mst[,1]), true.clust))
 ```
+
+# Clustering on a dataset with better linear separability
+
+We test AMPL-based and MST-based clustering on a linearly separable dataset, generated with a Gaussian blob generator. 
+
+```{r}
+blobs <- read.table('blobs.txt')
+blobs.clean <- blobs[,-3]
+blobs.dist <- as.matrix(dist(blobs.clean))
+write.table(blobs.dist, file='blobs_dist.dat', row.names = FALSE, col.names = FALSE)
+plot(blobs[, 1:2])
+```
+
+We see that, this time, clusters are very clearly linearly separable.
+
+The output of running clustering with AMPL is:
+```
+CPLEX 20.1.0.0: optimal integer solution; objective 238.2922866
+5225 MIP simplex iterations
+0 branch-and-bound nodes
+```
+
+```{r}
+blobs.out <- read.table('blobs_out.dat')
+blobs.ampl.cluster.medians <- get.cluster.medians(blobs.out)
+cat("Cluster medians are: ", blobs.ampl.cluster.medians, "\n")
+print(blobs[blobs.ampl.cluster.medians,])
+k <- 4
+blobs.confusion.matrix <- get.confusion.matrix(as.factor(blobs[,3]), blobs.out, k)
+print(blobs.confusion.matrix)
+dx <- blobs.out * blobs.dist
+cat("sum(dij * xij) = ", sum(dx))
+blobs.edge.list <- gen.edge.list(blobs.clean)
+m <- nrow(blobs.dist)
+blobs.mst.edge.list <- kruskal(blobs.edge.list, m)
+k <- 4
+n.edges <- nrow(blobs.mst.edge.list)
+blobs.clust.mst.edge.list <- blobs.mst.edge.list[1:(n.edges - (k - 1)),]
+blobs.dist.mst <- gen.dist.mst(blobs.clust.mst.edge.list, m)
+blobs.child.list.mst <- gen.child.list.mst(blobs.clust.mst.edge.list, m)
+blobs.mst.clust <- mst.cluster(blobs.child.list.mst, m)
+blobs.mst.colors <- gen.palette(blobs.mst.clust, m)
+ggnet2(blobs.dist.mst, node.size = 3, node.color = blobs.mst.colors, directed=FALSE)
+blobs.mst.median.nodes <- get.mst.median.nodes(blobs.mst.clust, blobs.dist, k)
+blobs.mst.median.nodes.dist <- get.mst.median.nodes.dist(blobs.mst.median.nodes, blobs.mst.clust, blobs.dist)
+cat("MST Objective:", sum(blobs.mst.median.nodes.dist), "\n")
+blobs.predicted.clust.mst <- as.data.frame(clust.mst)
+
+true.clust <- blobs[,3]
+true.clust <- as.factor(true.clust)
+levels(true.clust) <- true.clust[blobs.mst.median.nodes]
+
+print(confusionMatrix(as.factor(blobs.predicted.clust.mst[,1]), true.clust))
+```
+This time, the confusion matrix shows that MST-based clustering is able to achieve perfect accuracy, as is achieved by AMPL, and the two values of the objective function are the same.
 
 # Conclusions
 
-We can see that solving the problem using the minimum spanning tree as heuristic provides for a very poor quality clustering, with a value of the objective function being more than double the one obtained using AMPL and accuracy that is barely better than random guessing.
+We can see that for a dataset with poor linear separability, solving the problem using the minimum spanning tree as heuristic provides for a very poor quality clustering, with a value of the objective function being more than double the one obtained using AMPL and accuracy that is barely better than random guessing.
 
 # References
