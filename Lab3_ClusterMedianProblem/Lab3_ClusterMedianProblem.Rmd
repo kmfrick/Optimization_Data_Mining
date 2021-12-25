@@ -264,6 +264,11 @@ for (i in 1:cnt) {
   } 
 }
 cat("MST cost = ", mst.cost)
+```
+
+Now, we remove the $k - 1 = 2$ edges with largest weight in order to get three separate trees, which will be our clusters.
+
+```{r}
 n.edges <- nrow(new.edge.list)
 clust.edge.list <- new.edge.list[1:(n.edges - (k - 1)),]
 ```
