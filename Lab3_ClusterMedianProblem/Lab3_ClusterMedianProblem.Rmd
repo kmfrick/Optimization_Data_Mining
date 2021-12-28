@@ -436,10 +436,12 @@ invisible(apply(seeds[c(2,10,183,50),], 1, function(x) plot.grain(0,0,x[5],x[4],
 
 The $A$ matrix has therefore a final size of $210 \times 6$.
 
-We read the data file, remove the third and last column, as the last column corresponds to the correct cluster, then compute the distance matrix and write it to a file to be read by AMPL. We also perform principal component analysis to plot the dataset.
+We read the data file, remove the third and last column, as the last column corresponds to the correct cluster, then compute the distance matrix and write it to a file to be read by AMPL. We also perform principal component analysis to plot the dataset. Instead of plotting the points we plot the grains to have a deeper understanding of our dataset.
+
+\autoref{fig:2pca} shows that the first principal component corresponds to size, the grains on the left are smaller than those on the right side. However, our simple drawing doesn't show a clear relation between second principal component and the grains, this means that this component is related to other properties such as asymmetry coefficient.
 
 
-```{r pca-plot, fig.cap="2 PCA"}
+```{r pca-plot, fig.cap="\\label{fig:2pca} 2 PCA"}
 
 seeds.dist <- as.matrix(dist(seeds.clean))
 write.table(seeds.dist, file='seeds_dist.dat', row.names = FALSE, col.names = FALSE)
