@@ -313,11 +313,12 @@ mst.cluster <- function(child.list.mst, m) {
 }
 
 # Generate an array of colors
-gen.palette <- function(mst.clust, m) {
-  palette <- c("red", "green", "blue", "magenta", "black", "grey")
+gen.palette <- function(clust.mst, m) {
+  palette <- c("black", "red", "green", "blue", "magenta")
+
   colors <- c()
   for (i in 1:m) {
-    colors <- c(colors, palette[mst.clust[i]])
+    colors <- c(colors, palette[clust.mst[i]])
   }
   colors
 }
@@ -357,10 +358,10 @@ get.mst.median.nodes <- function(clust.mst, orig.dist, k) {
 }
 
 # Calculate the distance from the cluster medians
-get.mst.median.nodes.dist <- function(mst.median.nodes, mst.clust, orig.dist) {
+get.mst.median.nodes.dist <- function(mst.median.nodes, clust.mst, orig.dist) {
   mst.median.nodes.dist <- rep(0, length(mst.median.nodes))
   for (i in 1:nrow(orig.dist)) {
-    cur.cluster <- mst.clust[i]
+    cur.cluster <- clust.mst[i]
     cur.median <- mst.median.nodes[cur.cluster]
     mst.median.nodes.dist[cur.cluster] <- mst.median.nodes.dist[cur.cluster] + orig.dist[i, cur.median]
   }
@@ -480,16 +481,16 @@ Now, we remove the $k - 1 = 2$ edges with largest weight in order to get three s
 ```{r}
 k <- 3
 n.edges <- nrow(seeds.mst.edge.list)
-seeds.clust.mst.edge.list <- seeds.mst.edge.list[1:(n.edges - (k - 1)),]
+seeds.mst.edge.list <- seeds.mst.edge.list[1:(n.edges - (k - 1)),]
 ```
 
 We now run a connected components search to color the nodes according to their cluster.
 
 ```{r}
-seeds.dist.mst <- gen.dist.mst(seeds.clust.mst.edge.list, m)
-seeds.child.list.mst <- gen.child.list.mst(seeds.clust.mst.edge.list, m)
-seeds.mst.clust <- mst.cluster(seeds.child.list.mst, m)
-seeds.mst.colors <- gen.palette(seeds.mst.clust, m)
+seeds.dist.mst <- gen.dist.mst(seeds.mst.edge.list, m)
+seeds.child.list.mst <- gen.child.list.mst(seeds.mst.edge.list, m)
+seeds.clust.mst <- mst.cluster(seeds.child.list.mst, m)
+seeds.mst.colors <- gen.palette(seeds.clust.mst, m)
 ```
 
 We plot the resulting MST, and place the points on their position as given by PCA.
@@ -501,8 +502,8 @@ ggnet2(seeds.dist.mst, node.size = 3, node.color = seeds.mst.colors, directed=FA
 We now print the value of the objective function given by the MST heuristic.
 
 ```{r}
-seeds.mst.median.nodes <- get.mst.median.nodes(seeds.mst.clust, seeds.dist, k)
-seeds.mst.median.nodes.dist <- get.mst.median.nodes.dist(seeds.mst.median.nodes, seeds.mst.clust, seeds.dist)
+seeds.mst.median.nodes <- get.mst.median.nodes(seeds.clust.mst, seeds.dist, k)
+seeds.mst.median.nodes.dist <- get.mst.median.nodes.dist(seeds.mst.median.nodes, seeds.clust.mst, seeds.dist)
 cat("MST Objective:", sum(seeds.mst.median.nodes.dist), "\n")
 ```
 
@@ -511,7 +512,7 @@ We can see that this value is slightly more than double what is obtained by solv
 Finally, we print the confusion matrix of the clusters obtained with the MST.
 
 ```{r}
-seeds.confusion.matrix.mst <- get.confusion.matrix.mst(seeds[,8], clust.mst, seeds.mst.median.nodes)
+seeds.confusion.matrix.mst <- get.confusion.matrix.mst(seeds[,8], seeds.clust.mst, seeds.mst.median.nodes)
 print(seeds.confusion.matrix.mst$table)
 cat("Accuracy is ", 100 * round(seeds.confusion.matrix.mst$overall[[1]], 4), "%\n")
 ```
@@ -567,27 +568,33 @@ m <- nrow(blobs.dist)
 blobs.mst.edge.list <- kruskal(blobs.edge.list, m)
 k <- 4
 n.edges <- nrow(blobs.mst.edge.list)
-blobs.clust.mst.edge.list <- blobs.mst.edge.list[1:(n.edges - (k - 1)),]
-blobs.dist.mst <- gen.dist.mst(blobs.clust.mst.edge.list, m)
+blobs.mst.edge.list <- blobs.mst.edge.list[1:(n.edges - (k - 1)),]
+blobs.dist.mst <- gen.dist.mst(blobs.mst.edge.list, m)
 ```
 
 We now print the resulting tree, placing nodes in their location on the Cartesian plane.
 
 ```{r}
-blobs.child.list.mst <- gen.child.list.mst(blobs.clust.mst.edge.list, m)
-blobs.mst.clust <- mst.cluster(blobs.child.list.mst, m)
-blobs.mst.colors <- gen.palette(blobs.mst.clust, m)
-ggnet2(blobs.dist.mst, node.size = 3, node.color = blobs.mst.colors, directed=FALSE, mode = as.matrix(blobs))
+blobs.child.list.mst <- gen.child.list.mst(blobs.mst.edge.list, m)
+# Calculate the median nodes to set the correct color for each cluster median
+blobs.clust.mst <- mst.cluster(blobs.child.list.mst, m)
+blobs.mst.median.nodes <- get.mst.median.nodes(blobs.clust.mst, blobs.dist, k)
+blobs.clust.mst <- as.factor(blobs.clust.mst)
+levels(blobs.clust.mst) <- blobs[blobs.mst.median.nodes, 3]
+blobs.clust.mst <- as.numeric(as.character(blobs.clust.mst))
+blobs.mst.colors <- gen.palette(blobs.clust.mst, nrow(blobs))
+ggnet2(blobs.dist.mst, node.size = 3, node.color = blobs.mst.colors, 
+       directed=FALSE, mode = as.matrix(blobs))
 ```
 
 This time, we can see that accuracy is very high. To confirm this, we print the confusion matrix and the value of the objective function.
 
 
 ```{r}
-blobs.mst.median.nodes <- get.mst.median.nodes(blobs.mst.clust, blobs.dist, k)
-blobs.mst.median.nodes.dist <- get.mst.median.nodes.dist(blobs.mst.median.nodes, blobs.mst.clust, blobs.dist)
+blobs.mst.median.nodes <- get.mst.median.nodes(blobs.clust.mst, blobs.dist, k)
+blobs.mst.median.nodes.dist <- get.mst.median.nodes.dist(blobs.mst.median.nodes, blobs.clust.mst, blobs.dist)
 cat("MST Objective:", sum(blobs.mst.median.nodes.dist), "\n")
-blobs.predicted.clust.mst <- as.data.frame(clust.mst)
+blobs.predicted.clust.mst <- as.data.frame(blobs.clust.mst)
 
 true.clust <- blobs[,3]
 true.clust <- as.factor(true.clust)
