@@ -636,6 +636,7 @@ cat("Accuracy is ", 100 * round(blobs.confusion.matrix$overall[[1]], 4), "%\n")
 This time, the confusion matrix shows that MST-based clustering is able to achieve perfect accuracy, as is achieved by AMPL, and the two values of the objective function are the same.
 
 # Comparison
+\textbf{Accuracy} By definition our implementation of K-means is exact this implies that the accuracy finds the true centroids in any dataset. On the other hand, our experiments show two cases, one where heuristics perform bad, because nearly all points belong to the same cluster and another one, that shows that if clusters are clearly separated and don't overlap, the result is the same as the exact.
 
 \textbf{Theoretical Complexity} Exact solution for K-means has been proved to be NP-Complete @mahajan201213 and no polynomial time algorithm is known. The heuristic algorithm uses the Kruskal algorithm that can be computed in $O(E\log{V})$. The exact solution on medium-size instances is too hard for classical computers and approximate algorithms such as the one presented in this document are the best known methods for solving them.
 
