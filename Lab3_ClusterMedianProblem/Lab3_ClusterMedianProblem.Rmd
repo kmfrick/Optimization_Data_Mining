@@ -16,6 +16,8 @@ header-includes:
   - \usepackage{float}
   - \usepackage{longtable}
   - \usepackage{amsmath}
+  - \usepackage{hyperref}
+  - \usepackage{cleveref}
 ---
 \centering
 
@@ -31,6 +33,7 @@ library(GGally)
 library(network)
 library(sna)
 library(ggplot2)
+library(reshape2)
 ```
 
 <!-- 
@@ -63,38 +66,33 @@ where $D \in \mathbb{R}^{m \times n}$ is the distance matrix between points. We 
 The cluster-median problem can be formulated as an integer optimization problem.
 This provides an acceptable solution to the cluster-median problem, but is considered NP-hard in general, so it is only a viable for small data matrices.
 
-# Description of the dataset
+## Exact solution as an integer optimization problem
 
-We use a set of data on geometric parameters of three different varieties of wheat (@charytanowicz2010complete).
+The CMP can be formulated as an integer optimization problem as follows. A ``cluster matrix'' $X$ is defined so that $x_{ij} = 1$ if and only if point $i$ belongs to the cluster of which point $j$ is the median, $x_{ij} = 0$ otherwise.
 
-The parameters are:
+Then, an objective function is defined that calculates the sum of distances from the median of points belonging to a cluster, which is to be minimized.
 
-1. area $A$
-2. perimeter $P$
-3. compactness $C = 4\pi \frac{A}{P^2}$
-4. length of kernel
-5. width of kernel
-6. asymmetry coefficient
-7. length of kernel groove
+The matrix $X$ allows for easily defining this distance, since for each column of the $X$ matrix it suffices to add up the distances $d_{ij}$ for which $x_{ij}$ is 1. This will be 0 for $d_{jj}$ and some other number multiplied by one for each of the other points in the cluster. Our objective function therefore becomes $\sum\limits_{i = 1}^m \sum\limits_{j = 0}^m d_{ij} x_{ij}$, subject to the matrix $X$ being composed of binary elements, i.e. $x_{ij} \in \{0, 1\}$.
 
-All of these parameters are real-valued and continuous. We remove parameter 3 because it is a function of parameters 1 and 2. There are 70 observation per type of wheat.
+We then require that every point must belong to one (and only one cluster). We can do this by imposing that there must be *one and only one* value equal to one in each row of the matrix, that is 
 
-The $A$ matrix has therefore a final size of $210 \times 6$.
+\begin{equation}
+\sum\limits_{j = 1}^m x_{ij} = 1  \forall \; i \in \{1..m\}
+\end{equation}
 
-We read the data file, remove the third and last column, as the last column corresponds to the correct cluster, then compute the distance matrix and write it to a file to be read by AMPL. We also perform principal component analysis to plot the dataset.
+Up until now, there could be any number of clusters, up to $m$. However, we want to impose that there can be exactly $k$ clusters. If a diagonal element $x_{jj}$ is equal to one, then it means that point $j$ is the median of a cluster. If we require that there be only $k$ diagonal elements equal to one, we constrain the problem to contain $k$ clusters. This is expressed as
 
-```{r}
-seeds <- read.table('seeds.txt')
-seeds.clean <- seeds[,-c(3, 8)]
-seeds.dist <- as.matrix(dist(seeds.clean))
-write.table(seeds.dist, file='seeds_dist.dat', row.names = FALSE, col.names = FALSE)
-seeds.pca <- princomp(seeds.clean)
-plot(seeds.pca$scores[,1:2], col=seeds[,8])
-```
+\begin{equation}
+\sum\limits_{j = 1}^m x_{jj} = k
+\end{equation}
 
-# Modeling the CMP in AMPL
+We now have to require points to only belong to clusters that are allowed to exist by this constraint, which means that a column can only have values equal to one if the diagonal element of that column is equal to one (i.e. it is allowed to be a cluster by the previous constraint). This is expressed as 
 
-We formulate the integer optimization problem as follows:
+\begin{equation}
+x_{jj} \geq x_{ij} \forall \; i,j \in \{1..m\}
+\end{equation}
+
+Putting these constraints together with the objective function results in the following integer optimization problem.
 
 \begin{equation}
 \begin{array}{l l l}
@@ -107,17 +105,12 @@ s.t. & \sum\limits_{j = 1}^m x_{ij} = 1 & \forall \; i \in \{1..m\}\\
 \end{array}
 \end{equation}
 
-The first constraint means that every point must belong to one cluster.
-The second requires that there be exactly $k$ clusters.
-The third means that A point may belong to a cluster only if the cluster exists.
-The last constraints means the variables are binary.
-
-This results in the following AMPL `.mod` file:
+We can model the optimization problem in AMPL in the following `.mod` file:
 
 ```
-param m := 210; # 70 data points per variety
-param n := 6; # 6 features
-param k := 3; # 3 varieties of wheat
+param m; # Number of data points
+param n; # Number of features
+param k; # Number of clusters
 param d {i in 1..m, j in 1..m};
 var x {i in 1..m, j in 1..m} binary;
 
@@ -133,33 +126,28 @@ subject to clusterexists {i in 1..m, j in 1..m}:
 x[j,j] >= x[i,j];
 ```
 
-Which we call using the following `.run` file:
+Which can be called using a `.run` file similar to the following, which will read the $D$ matrix from the file `dist.dat` and output the $X$ matrix to the file `out.dat`.
+
 ```
 reset;
 model cluster.mod;
 for {i in 1..m} {
 	for {j in 1..m} {
-		read d[i, j] < seeds_dist.dat;
+		read d[i, j] < dist.dat;
 	}
 }
 option solver cplex;
 solve;
 for {i in 1..m} {
 	for {j in 1..m} {
-		printf "%d ", x[i, j] > seeds_out.dat;
+		printf "%d ", x[i, j] > out.dat;
 	}
-	printf "\n" > seeds_out.dat;
+	printf "\n" > out.dat;
 }
 ```
 
-Which gives the following output:
-```
-CPLEX 20.1.0.0: optimal integer solution; objective 314.2081702
-11 MIP simplex iterations
-0 branch-and-bound nodes
-```
+After, we can read the `out.dat` file and check which points correspond to the cluster medians. These will be the columns/rows of the non-zero diagonal elements.
 
-After running the file, we check which points correspond to the cluster medians:
 ```{r}
 get.cluster.medians <- function(outf) {
   ampl.cluster.medians <- c()
@@ -170,51 +158,52 @@ get.cluster.medians <- function(outf) {
   }
   ampl.cluster.medians
 }
-seeds.out <- read.table('seeds_out.dat')
-seeds.ampl.cluster.medians <- get.cluster.medians(seeds.out)
-cat("Cluster medians are: ", seeds.ampl.cluster.medians, "\n")
 ```
 
-We check which varieties do those points belong to in the original dataset:
+## Heuristic solution using a minimum spanning tree
+
+A widely-used heuristic solution to the cluster median problem, described for example in @olson1995parallel, uses the minimum spanning tree of the complete graph generated from the distance matrix $D$ to compute an estimate of the optimal solution. 
+
+An undirected graph is defined as a set $V$ of vertices, or nodes, and a set $E$ of pairs of nodes, whose elements are called edges. A graph is weighted if every edge has an associated scalar, called *weight*.  A graph is *complete* if *every pair of nodes is connected* by an edge. 
+A graph is *connected* if there exists a path between any pair of nodes in the graph, where a path is a set of edges that allows to reach one node from another by subsequent traversal.
+A connected graph is called a *tree* if any pair of nodes are connected by *one and only one path*. Removing a single edge from a tree will split it in two, non-connected subtrees.
+
+The minimum spanning tree of a connected, undirected, weighted graph is a subset of edges so that the graph remains connected (hence *spanning*) and the sum of the weights of the edges is minimized (hence *minimum*).
+
+A complete graph can be trivially constructed from a distance matrix by connecting every pair of nodes $u, v$ with an edge whose weight is equal to $d_{uv}$. Once the minimum spanning tree of this complete graph is computed, it suffices to remove the $k - 1$ edges of highest cost to obtain $k$ distinct, non-connected subtrees, which will be our clusters. The cost of traversing this tree will be low in general, but the objective function is the overall cost of the tree, not of the single cluster, and there is no notion of a cluster median. 
+Therefore, the solution will not be optimal in general.
+
+There are many algorithms to construct a minimum spanning tree. In this work, we use the one described in @kruskal1956shortest. 
+
+Kruskal's algorithm requires an edge list sorted in non-decreasing order of weight. Then, it  greedily tries to add each edge to an initially empty MST, checking that this addition does not form a cycle, i.e. that there is not already a path that connects the two nodes. 
+This cycle check can be done in $O(1)$ by using a union-find disjoint set, described below. The complexity of this algorithm is given by sorting + trying to add each edge times the  cost of Union-Find operations = $O(E \log E + E \times (\approx 1)) = O(E \log E) = O(E \log V^2) = O(2 \times E \log V ) = O(E \log V)$. The main challenge of Kruskal's algorithm therefore lies not in the algorithm itself, but in making sure that the union-find operations are actually approximately in $O(1)$.
+
+A union-find disjoint set (UFDS) is a data structure that model a collection of disjoint sets with the ability to efficiently (in $\approx O(1)$) determine which set an item belongs to (or to test whether two items belong to the same set) and to join two disjoint sets into one larger set. 
+To do this, we choose a representative "parent" item to represent a set. If we can ensure that each set is represented by only one unique item, then determining if items belong to the same set becomes simple, as the parent can be used as a sort of identifier for the set.
+To achieve this, we create a tree structure where the disjoint sets form a forest of trees. 
+Each tree corresponds to a disjoint set. The root of the tree is determined to be the representative item for a set. Thus, the representative set identifier for an item can be obtained simply by following the chain of parents to the root of the tree, and since a tree can only have one root, this representative item can be used as a unique identifier for the set.
+To do this efficiently, we use two optimizations:
+
+ - we store the index of the parent item $p_i$ and an upper bound $rank_i$ for the height of the tree of each set. If item $i$ is the representative item of a certain disjoint set, then $p_i = i$. To unite two disjoint sets, we set the representative item (root) of one disjoint set to be the new parent of the representative item of the other disjoint set. This effectively merges the two trees, making both items to have the same parent, directly or indirectly. For efficiency, we can use the value of $rank_i$ to set the representative item of the disjoint set with higher rank to be the new parent of the disjoint set with lower rank, thereby minimizing the rank of the resulting tree. If both ranks are the same, we arbitrarily choose one of them as the new parent and increase the resultant root's rank.
+ - we use *path compression*. Whenever we find the root item of a disjoint set by following the chain of parent links from a given item, we can set the parent of all items traversed to point directly to the root. Any subsequent check for the set that item belongs to will then result in only one link being traversed. This changes the structure of the tree, but preserves the actual constitution of the disjoint set. 
+ 
+We implement from scratch in R the generation of an edge list from an adjacency matrix, a union-find disjoint set, and Kruskal's algorithm. Code for our implementation is provided below.
 
 ```{r}
-print(seeds[seeds.ampl.cluster.medians,])
-```
+# Generate edge list from distance matrix
+# Duplicates are not deleted, because they will not be counted by Kruscal algorithm
+# If a check is O(1), this only adds an O(E) overhead
+gen.edge.list <- function(mat) {
+	mat <- as.matrix(mat)
+	edge.list <- melt(mat)
+	colnames(edge.list) <- c('from', 'to', 'dist')
+	edge.list <- edge.list[edge.list$from != edge.list$to,]
+	edge.list
+}	
 
-Since we have ground truth labels, we can print the confusion matrix.
-
-```{r}
-get.confusion.matrix <- function(true.clust, out, k) {
-  predicted.clust <- as.data.frame(matrix(0, nrow = nrow(out), ncol = 1))
-  ampl.cluster.medians <- get.cluster.medians(out)
-  i <- 1
-  for (col in out[,ampl.cluster.medians]) {
-    clust.i <- which(col == 1)
-    predicted.clust[clust.i,1] <- i
-    i <- i + 1
-  }
-  predicted.clust
-  confusionMatrix(as.factor(predicted.clust[,1]), true.clust)
-}
-k <- 3
-seeds.confusion.matrix <- get.confusion.matrix(as.factor(seeds[,8]), seeds.out, k)
-print(seeds.confusion.matrix)
-```
-
-The value of the objective function is:
-
-```{r}
-dx <- seeds.out * seeds.dist
-cat("sum(dij * xij) = ", sum(dx))
-```
-
-Which matches what is given by AMPL.
-
-# The CMP as a MST problem
-
-We implement a union-find disjoint set data structure (UFDS). We use path compression to keep the tree short and always attach in such a way as to keep the tree short, using the rank of a node to choose which attachment point to use.
-
-```{r}
+# UFDS
+# p: parent of an item (initially p[i] = i for all i)
+# rank: upper bound to tree depth excluding root (initially 0)
 reset.ufds <- function(m) {
   ufds.rank <<- rep(0, m)
   p <<- as.numeric(1:m)
@@ -247,31 +236,8 @@ union.set <- function(i, j) {
     }
   }
 }
-```
 
-We implement Kruskal's algorithm to get the minimum spanning tree.
-
-```{r}
-gen.edge.list <- function(datamat) {
-  dist.matrix <- as.matrix(dist(datamat))
-  m <- nrow(dist.matrix)
-  edge.list <- as.data.frame(matrix(0, nrow = m * m - m, ncol = 3))
-  names(edge.list) <- c('from', 'to', 'dist')
-  cnt <- 1
-  for (i in 1:m) {
-    for (j in 1:m) {
-      if (j != i) {
-        edge.list[cnt,] <- c(i, j, dist.matrix[i, j])
-        cnt <- cnt + 1
-      }
-    }
-  }
-  edge.list
-}
-seeds.edge.list <- gen.edge.list(seeds.clean)
-```
-
-```{r}
+# Kruskal's algorithm
 kruskal <- function(edge.list, m) {
   mst.cost <- 0
   reset.ufds(m)
@@ -288,30 +254,21 @@ kruskal <- function(edge.list, m) {
   cat("MST cost = ", mst.cost)
   mst.edge.list
 }
-m <- nrow(seeds.dist)
-seeds.mst.edge.list <- kruskal(seeds.edge.list, m)
 ```
 
-Now, we remove the $k - 1 = 2$ edges with largest weight in order to get three separate trees, which will be our clusters.
+## Quantitative evaluation
+
+Finally, to evaluate and compare the accuracy of the two approaches, we will use two metrics. The first is the total distance to the cluster median, which is the objective function that is minimized in the integer programming formulation. 
+By definition, the solution obtained by solving the integer optimization problem will be optimal and provide a point of comparison for what is obtained with the MST heuristic.
+Computing this value is trivial given matrices $D$ and $X$, but is more complex when the problem is solved with a MST.  
+Once the tree is computed, the points belonging to each cluster have to be enumerated. An adjacency list is therefore computed from the edge list, and a depth-first search (DFS) is launched starting from every node in the tree, skipping those that have already been visited by previous searches.
+This last check will ensure that only $k$ DFSes will actually be launched.
+The nodes visited starting from each point will be those belonging to the same cluster as the starting node. 
+
+We implement our own DFS and adjacency list generation from scratch in R. Code for our implementation is provided below. We also provide a function that generates an array of colors starting from cluster labels, to be used for plotting with the `ggnet2` library.
 
 ```{r}
-k <- 3
-n.edges <- nrow(seeds.mst.edge.list)
-seeds.clust.mst.edge.list <- seeds.mst.edge.list[1:(n.edges - (k - 1)),]
-```
-
-We now run a connected components search to color the nodes according to their cluster.
-
-```{r}
-gen.dist.mst <- function(clust.edge.list, m) {
-  dist.mst <- matrix(0, nrow = m, ncol = m)
-  for (i in 1:nrow(clust.edge.list)) {
-    r <- clust.edge.list[i,]
-    dist.mst[r$from, r$to] <- r$dist
-    dist.mst[r$to, r$from] <- r$dist
-  }
-  dist.mst
-}
+# Generate an adjacency list
 gen.child.list.mst <- function(clust.edge.list, m) {
   child.list.mst <- vector("list", m)
   for (i in 1:m) {
@@ -325,6 +282,7 @@ gen.child.list.mst <- function(clust.edge.list, m) {
   child.list.mst
 }
 
+# Connected components DFS
 mst.cluster <- function(child.list.mst, m) {
   visited <<- rep(FALSE, m)
   clust.mst <<- rep(0, m)
@@ -354,6 +312,7 @@ mst.cluster <- function(child.list.mst, m) {
   clust.mst
 }
 
+# Generate an array of colors
 gen.palette <- function(mst.clust, m) {
   palette <- c("red", "green", "blue", "magenta", "black", "grey")
   colors <- c()
@@ -362,22 +321,23 @@ gen.palette <- function(mst.clust, m) {
   }
   colors
 }
-
-seeds.dist.mst <- gen.dist.mst(seeds.clust.mst.edge.list, m)
-seeds.child.list.mst <- gen.child.list.mst(seeds.clust.mst.edge.list, m)
-seeds.mst.clust <- mst.cluster(seeds.child.list.mst, m)
-seeds.mst.colors <- gen.palette(seeds.mst.clust, m)
-
-```
-We now plot the resulting MST.
-
-```{r}
-ggnet2(seeds.dist.mst, node.size = 3, node.color = seeds.mst.colors, directed=FALSE)
 ```
 
-We now calculate the median point for each cluster as $\arg\min\limits_{j \in C} \sum\limits_{i \in C} d_{ij}$.
+After enumerating the points belonging to each cluster, the median for each cluster is calculated as the point that minimizes the sum of distances within that cluster, that is as $\arg\min\limits_{j \in C} \sum\limits_{i \in C} d_{ij}$. This requires efficient access to distances between nodes, so an adjacency matrix is constructed starting from the MST edge list. We implement from scratch in R such a function, as well as the generation of an adjacency matrix from an edge list. Code for our implementation is provided below.
 
 ```{r}
+# Generate an adjacency matrix
+gen.dist.mst <- function(clust.edge.list, m) {
+  dist.mst <- matrix(0, nrow = m, ncol = m)
+  for (i in 1:nrow(clust.edge.list)) {
+    r <- clust.edge.list[i,]
+    dist.mst[r$from, r$to] <- r$dist
+    dist.mst[r$to, r$from] <- r$dist
+  }
+  dist.mst
+}
+
+# Calculate the cluster median for each cluster
 get.mst.median.nodes <- function(clust.mst, orig.dist, k) {
   dist.clust.mst <- vector("numeric", k)
   median.node <- vector("numeric", k)
@@ -395,12 +355,8 @@ get.mst.median.nodes <- function(clust.mst, orig.dist, k) {
   }
   median.node
 }
-seeds.mst.median.nodes <- get.mst.median.nodes(seeds.mst.clust, seeds.dist, k)
-```
 
-We now print the value of the objective function as calculated with the MST.
-
-```{r}
+# Calculate the distance from the cluster medians
 get.mst.median.nodes.dist <- function(mst.median.nodes, mst.clust, orig.dist) {
   mst.median.nodes.dist <- rep(0, length(mst.median.nodes))
   for (i in 1:nrow(orig.dist)) {
@@ -410,6 +366,142 @@ get.mst.median.nodes.dist <- function(mst.median.nodes, mst.clust, orig.dist) {
   }
   mst.median.nodes.dist
 }
+```
+
+Finally, since both the datasets we used have ground truth labels, we can print a confusion matrix, that is a $k \times k$ matrix whose element at the $i$-th row and $j$-th column reports the number of data points belonging to cluster $j$ which were classified as belonging to cluster $i$.
+This allows us to evaluate how well the cluster-median approach fits the clustering problem at hand, even in the case of the optimal solution.
+That is, it is not a given that clustering elements by solving the cluster-median problem is the optimal approach, even if the solution computed is optimal, and other clustering algorithms, such as density-based clustering, might be more accurate.
+
+In the case of perfect accuracy, the confusion matrix is expected to be diagonal. In order to print a sensible matrix, we need to match the generated clusters to the ground truth labels, i.e. ensure that cluster number $i$ has the same number in both ground truth and in our estimation. To do so, we use the R code below.
+
+```{r}
+get.confusion.matrix.optimal <- function(true.clust, out, k) {
+  predicted.clust <- as.data.frame(matrix(0, nrow = nrow(out), ncol = 1))
+  ampl.cluster.medians <- get.cluster.medians(out)
+  i <- 1
+  for (col in ampl.cluster.medians) {
+    clust.i <- which(out[,col] == 1)
+    predicted.clust[clust.i,1] <- true.clust[col]
+    i <- i + 1
+  }
+
+  confusionMatrix(as.factor(predicted.clust[,1]), true.clust)
+}
+
+get.confusion.matrix.mst <- function(true.clust, clust.mst, mst.median.nodes) {
+  predicted.clust.mst <- as.data.frame(clust.mst)
+  
+  true.clust <- as.factor(true.clust)
+  levels(true.clust) <- true.clust[mst.median.nodes]
+  confusionMatrix(as.factor(predicted.clust.mst[,1]), true.clust)
+}
+```
+
+# Wheat varieties dataset
+
+## Description of the dataset
+
+We use a set of data on geometric parameters of three different varieties of wheat, as described in @charytanowicz2010complete.
+
+The features of this dataset are:
+
+1. area $A$
+2. perimeter $P$
+3. compactness $C = 4\pi \frac{A}{P^2}$
+4. length of kernel
+5. width of kernel
+6. asymmetry coefficient
+7. length of kernel groove
+
+All of these parameters are real-valued and continuous. We remove feature 3 because it is a function of features 1 and 2. There are 70 observation per type of wheat.
+
+The $A$ matrix has therefore a final size of $210 \times 6$.
+
+We read the data file, remove the third and last column, as the last column corresponds to the correct cluster, then compute the distance matrix and write it to a file to be read by AMPL. We also perform principal component analysis to plot the dataset.
+
+```{r}
+seeds <- read.table('seeds.txt')
+seeds.clean <- seeds[,-c(3, 8)]
+seeds.dist <- as.matrix(dist(seeds.clean))
+write.table(seeds.dist, file='seeds_dist.dat', row.names = FALSE, col.names = FALSE)
+seeds.pca <- princomp(seeds.clean)
+plot(seeds.pca$scores[,1:2], col=seeds[,8])
+```
+
+We can see that the clusters are well-separable in two dimensions, although they are very close together and there is considerable overlap.
+
+## Optimal solution
+
+Solving the optimization problem with AMPL gives the following output:
+```
+CPLEX 20.1.0.0: optimal integer solution; objective 314.2081702
+11 MIP simplex iterations
+0 branch-and-bound nodes
+```
+
+After finding the optimal solutions, we check which points correspond to the cluster medians.
+
+```{r}
+seeds.out <- read.table('seeds_out.dat')
+seeds.ampl.cluster.medians <- get.cluster.medians(seeds.out)
+cat("Cluster medians are: ", seeds.ampl.cluster.medians, "\n")
+```
+
+We now print the confusion matrix.
+
+```{r}
+k <- 3
+seeds.confusion.matrix <- get.confusion.matrix.optimal(as.factor(seeds[,8]), seeds.out, k)
+print(seeds.confusion.matrix$table)
+cat("Accuracy is ", 100 * round(seeds.confusion.matrix$overall[[1]], 4), "%\n")
+```
+
+The value of the objective function is:
+
+```{r}
+dx <- seeds.out * seeds.dist
+cat("sum(d_ij * x_ij) = ", sum(dx))
+```
+
+Which matches what is given by AMPL.
+
+## Heuristic solution
+
+We use Kruskal's algorithm to get the minimum spanning tree.
+
+```{r}
+seeds.edge.list <- gen.edge.list(seeds.dist)
+m <- nrow(seeds.dist)
+seeds.mst.edge.list <- kruskal(seeds.edge.list, m)
+```
+
+Now, we remove the $k - 1 = 2$ edges with largest weight in order to get three separate trees, which will be our clusters.
+
+```{r}
+k <- 3
+n.edges <- nrow(seeds.mst.edge.list)
+seeds.clust.mst.edge.list <- seeds.mst.edge.list[1:(n.edges - (k - 1)),]
+```
+
+We now run a connected components search to color the nodes according to their cluster.
+
+```{r}
+seeds.dist.mst <- gen.dist.mst(seeds.clust.mst.edge.list, m)
+seeds.child.list.mst <- gen.child.list.mst(seeds.clust.mst.edge.list, m)
+seeds.mst.clust <- mst.cluster(seeds.child.list.mst, m)
+seeds.mst.colors <- gen.palette(seeds.mst.clust, m)
+```
+
+We plot the resulting MST, and place the points on their position as given by PCA.
+
+```{r}
+ggnet2(seeds.dist.mst, node.size = 3, node.color = seeds.mst.colors, directed=FALSE, mode = seeds.pca$scores)
+```
+
+We now print the value of the objective function given by the MST heuristic.
+
+```{r}
+seeds.mst.median.nodes <- get.mst.median.nodes(seeds.mst.clust, seeds.dist, k)
 seeds.mst.median.nodes.dist <- get.mst.median.nodes.dist(seeds.mst.median.nodes, seeds.mst.clust, seeds.dist)
 cat("MST Objective:", sum(seeds.mst.median.nodes.dist), "\n")
 ```
@@ -419,28 +511,30 @@ We can see that this value is slightly more than double what is obtained by solv
 Finally, we print the confusion matrix of the clusters obtained with the MST.
 
 ```{r}
-seeds.predicted.clust.mst <- as.data.frame(clust.mst)
-
-true.clust <- seeds[,8]
-true.clust <- as.factor(true.clust)
-levels(true.clust) <- true.clust[seeds.mst.median.nodes]
-
-print(confusionMatrix(as.factor(seeds.predicted.clust.mst[,1]), true.clust))
+seeds.confusion.matrix.mst <- get.confusion.matrix.mst(seeds[,8], clust.mst, seeds.mst.median.nodes)
+print(seeds.confusion.matrix.mst$table)
+cat("Accuracy is ", 100 * round(seeds.confusion.matrix.mst$overall[[1]], 4), "%\n")
 ```
 
-# Clustering on a dataset with better linear separability
+# Gaussian blobs
 
-We test AMPL-based and MST-based clustering on a linearly separable dataset, generated with a Gaussian blob generator. 
+## Description of the dataset
+
+We test AMPL-based and MST-based clustering on a dataset with better cluster separability. We use the `make_blobs()` function of the `scikit-learn` Python library to generate a dataset of 200 normally-distributed points separated in 4 clusters. We set the RNG seed to 42 to ensure reproducibility. The command to be run, after importing the library, is then `make_blobs(200, centers=4, random_state=42)`.
+
+We read this dataset from a file and plot it.
 
 ```{r}
 blobs <- read.table('blobs.txt')
 blobs.clean <- blobs[,-3]
 blobs.dist <- as.matrix(dist(blobs.clean))
 write.table(blobs.dist, file='blobs_dist.dat', row.names = FALSE, col.names = FALSE)
-plot(blobs[, 1:2])
+plot(blobs[, 1:2], col = blobs[,3])
 ```
 
 We see that, this time, clusters are very clearly linearly separable.
+
+## Optimal solution
 
 The output of running clustering with AMPL is:
 ```
@@ -453,23 +547,43 @@ CPLEX 20.1.0.0: optimal integer solution; objective 238.2922866
 blobs.out <- read.table('blobs_out.dat')
 blobs.ampl.cluster.medians <- get.cluster.medians(blobs.out)
 cat("Cluster medians are: ", blobs.ampl.cluster.medians, "\n")
-print(blobs[blobs.ampl.cluster.medians,])
 k <- 4
-blobs.confusion.matrix <- get.confusion.matrix(as.factor(blobs[,3]), blobs.out, k)
-print(blobs.confusion.matrix)
+blobs.confusion.matrix <- get.confusion.matrix.optimal(as.factor(blobs[,3]), blobs.out, k)
+print(blobs.confusion.matrix$table)
+cat("Accuracy is ", 100 * round(blobs.confusion.matrix$overall[[1]], 4), "%\n")
 dx <- blobs.out * blobs.dist
 cat("sum(dij * xij) = ", sum(dx))
-blobs.edge.list <- gen.edge.list(blobs.clean)
+```
+
+We can see that, in this case, the optimal solution provides perfect accuracy with respect to ground truth.
+
+## Heuristic solution
+
+We generate the edge list and calculate the MST.
+
+```{r}
+blobs.edge.list <- gen.edge.list(blobs.dist)
 m <- nrow(blobs.dist)
 blobs.mst.edge.list <- kruskal(blobs.edge.list, m)
 k <- 4
 n.edges <- nrow(blobs.mst.edge.list)
 blobs.clust.mst.edge.list <- blobs.mst.edge.list[1:(n.edges - (k - 1)),]
 blobs.dist.mst <- gen.dist.mst(blobs.clust.mst.edge.list, m)
+```
+
+We now print the resulting tree, placing nodes in their location on the Cartesian plane.
+
+```{r}
 blobs.child.list.mst <- gen.child.list.mst(blobs.clust.mst.edge.list, m)
 blobs.mst.clust <- mst.cluster(blobs.child.list.mst, m)
 blobs.mst.colors <- gen.palette(blobs.mst.clust, m)
-ggnet2(blobs.dist.mst, node.size = 3, node.color = blobs.mst.colors, directed=FALSE)
+ggnet2(blobs.dist.mst, node.size = 3, node.color = blobs.mst.colors, directed=FALSE, mode = as.matrix(blobs))
+```
+
+This time, we can see that accuracy is very high. To confirm this, we print the confusion matrix and the value of the objective function.
+
+
+```{r}
 blobs.mst.median.nodes <- get.mst.median.nodes(blobs.mst.clust, blobs.dist, k)
 blobs.mst.median.nodes.dist <- get.mst.median.nodes.dist(blobs.mst.median.nodes, blobs.mst.clust, blobs.dist)
 cat("MST Objective:", sum(blobs.mst.median.nodes.dist), "\n")
@@ -477,14 +591,17 @@ blobs.predicted.clust.mst <- as.data.frame(clust.mst)
 
 true.clust <- blobs[,3]
 true.clust <- as.factor(true.clust)
-levels(true.clust) <- true.clust[blobs.mst.median.nodes]
 
-print(confusionMatrix(as.factor(blobs.predicted.clust.mst[,1]), true.clust))
+blobs.conf.matrix <- get.confusion.matrix.mst(true.clust, blobs.predicted.clust.mst, blobs.mst.median.nodes)
+print(blobs.confusion.matrix$table)
+cat("Accuracy is ", 100 * round(blobs.confusion.matrix$overall[[1]], 4), "%\n")
 ```
+
 This time, the confusion matrix shows that MST-based clustering is able to achieve perfect accuracy, as is achieved by AMPL, and the two values of the objective function are the same.
 
 # Conclusions
 
-We can see that for a dataset with poor linear separability, solving the problem using the minimum spanning tree as heuristic provides for a very poor quality clustering, with a value of the objective function being more than double the one obtained using AMPL and accuracy that is barely better than random guessing.
+We can see that for a dataset with clusters that are overlapping and not isolated, solving the problem using the minimum spanning tree as heuristic provides for a very poor quality clustering, with a value of the objective function being more than double the one obtained using AMPL and accuracy that is barely better than random guessing.
+
 
 # References
