@@ -34,6 +34,7 @@ library(network)
 library(sna)
 library(ggplot2)
 library(reshape2)
+library(plotrix)
 ```
 
 <!-- 
@@ -129,7 +130,6 @@ x[j,j] >= x[i,j];
 Which can be called using a `.run` file similar to the following, which will read the $D$ matrix from the file `dist.dat` and output the $X$ matrix to the file `out.dat`.
 
 ```
-reset;
 model cluster.mod;
 for {i in 1..m} {
 	for {j in 1..m} {
@@ -184,8 +184,8 @@ To achieve this, we create a tree structure where the disjoint sets form a fores
 Each tree corresponds to a disjoint set. The root of the tree is determined to be the representative item for a set. Thus, the representative set identifier for an item can be obtained simply by following the chain of parents to the root of the tree, and since a tree can only have one root, this representative item can be used as a unique identifier for the set.
 To do this efficiently, we use two optimizations:
 
- - we store the index of the parent item $p_i$ and an upper bound $rank_i$ for the height of the tree of each set. If item $i$ is the representative item of a certain disjoint set, then $p_i = i$. To unite two disjoint sets, we set the representative item (root) of one disjoint set to be the new parent of the representative item of the other disjoint set. This effectively merges the two trees, making both items to have the same parent, directly or indirectly. For efficiency, we can use the value of $rank_i$ to set the representative item of the disjoint set with higher rank to be the new parent of the disjoint set with lower rank, thereby minimizing the rank of the resulting tree. If both ranks are the same, we arbitrarily choose one of them as the new parent and increase the resultant root's rank.
- - we use *path compression*. Whenever we find the root item of a disjoint set by following the chain of parent links from a given item, we can set the parent of all items traversed to point directly to the root. Any subsequent check for the set that item belongs to will then result in only one link being traversed. This changes the structure of the tree, but preserves the actual constitution of the disjoint set. 
+ - We store the index of the parent item $p_i$ and an upper bound $rank_i$ for the height of the tree of each set. If item $i$ is the representative item of a certain disjoint set, then $p_i = i$. To unite two disjoint sets, we set the representative item (root) of one disjoint set to be the new parent of the representative item of the other disjoint set. This effectively merges the two trees, making both items to have the same parent, directly or indirectly. For efficiency, we can use the value of $rank_i$ to set the representative item of the disjoint set with higher rank to be the new parent of the disjoint set with lower rank, thereby minimizing the rank of the resulting tree. If both ranks are the same, we arbitrarily choose one of them as the new parent and increase the resultant root's rank.
+ - We use *path compression*. Whenever we find the root item of a disjoint set by following the chain of parent links from a given item, we can set the parent of all items traversed to point directly to the root. Any subsequent check for the set that item belongs to will then result in only one link being traversed. This changes the structure of the tree, but preserves the actual constitution of the disjoint set. 
  
 We implement from scratch in R the generation of an edge list from an adjacency matrix, a union-find disjoint set, and Kruskal's algorithm. Code for our implementation is provided below.
 
@@ -416,17 +416,41 @@ The features of this dataset are:
 
 All of these parameters are real-valued and continuous. We remove feature 3 because it is a function of features 1 and 2. There are 70 observation per type of wheat.
 
+To represent the grains we use the properties length (4) and width (5). On Figure \@ref(plot-grains) we see some example grains of the dataset.
+
+```{r plot-grains, fig.cap="Example grains"}
+seeds <- read.table('seeds.txt')
+seeds.clean <- seeds[,-c(3, 8)]
+
+plot.grain <- function(x, y, a,b,scale=1, col=1,add=TRUE,...){
+  if (!add){
+    plot(x, y, type="n", ...)
+  }
+  draw.ellipse(x, y, a=scale*a/2, b=scale*b/2, col=col)
+}
+
+par(mfrow=c(2,2))
+invisible(apply(seeds[c(2,10,183,50),], 1, function(x) plot.grain(0,0,x[5],x[4],scale=0.05,add=FALSE)))
+```
+
 The $A$ matrix has therefore a final size of $210 \times 6$.
 
 We read the data file, remove the third and last column, as the last column corresponds to the correct cluster, then compute the distance matrix and write it to a file to be read by AMPL. We also perform principal component analysis to plot the dataset.
 
-```{r}
-seeds <- read.table('seeds.txt')
-seeds.clean <- seeds[,-c(3, 8)]
+
+```{r pca-plot, fig.cap="2 PCA"}
+
 seeds.dist <- as.matrix(dist(seeds.clean))
 write.table(seeds.dist, file='seeds_dist.dat', row.names = FALSE, col.names = FALSE)
 seeds.pca <- princomp(seeds.clean)
-plot(seeds.pca$scores[,1:2], col=seeds[,8])
+
+plot(seeds.pca$scores[,1:2], col=seeds[,8], xlab="Component 1", ylab="Component 2", opacity=.3)
+X <- seeds.pca$scores[,1]
+Y <- seeds.pca$scores[,2]
+n <- dim(seeds)[1]
+for (i in 1:n){
+  plot.grain(X[i], Y[i], seeds[i,5], seeds[i,4], scale=.08, col=seeds[i, 8], add=TRUE)
+}
 ```
 
 We can see that the clusters are well-separable in two dimensions, although they are very close together and there is considerable overlap.
@@ -495,10 +519,12 @@ seeds.mst.colors <- gen.palette(seeds.clust.mst, m)
 
 We plot the resulting MST, and place the points on their position as given by PCA.
 
-```{r}
-ggnet2(seeds.dist.mst, node.size = 3, node.color = seeds.mst.colors, directed=FALSE, mode = seeds.pca$scores)
+```{r warning=FALSE}
+net = network(seeds.dist.mst)
+net %v% "x" = seeds.pca$scores[,1]
+net %v% "y" = seeds.pca$scores[,2]
+ggnet2(net, node.size = 3, node.color = seeds.mst.colors, directed=FALSE, mode = c("x", "y"))
 ```
-
 We now print the value of the objective function given by the MST heuristic.
 
 ```{r}
@@ -605,6 +631,9 @@ cat("Accuracy is ", 100 * round(blobs.confusion.matrix$overall[[1]], 4), "%\n")
 ```
 
 This time, the confusion matrix shows that MST-based clustering is able to achieve perfect accuracy, as is achieved by AMPL, and the two values of the objective function are the same.
+
+# Analysis
+
 
 # Conclusions
 
