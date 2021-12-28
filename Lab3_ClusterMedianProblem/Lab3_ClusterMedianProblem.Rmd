@@ -416,9 +416,9 @@ The features of this dataset are:
 
 All of these parameters are real-valued and continuous. We remove feature 3 because it is a function of features 1 and 2. There are 70 observation per type of wheat.
 
-To represent the grains we use the properties length (4) and width (5). On Figure \@ref(plot-grains) we see some example grains of the dataset.
+To represent the grains we use the properties length (4) and width (5). On \autoref{plot-grains} we see some example grains of the dataset.
 
-```{r plot-grains, fig.cap="Example grains"}
+```{r fig.cap="\\label{plot-grains} Example grains"}
 seeds <- read.table('seeds.txt')
 seeds.clean <- seeds[,-c(3, 8)]
 
