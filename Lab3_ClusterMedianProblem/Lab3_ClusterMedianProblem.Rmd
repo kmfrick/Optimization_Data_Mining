@@ -35,6 +35,7 @@ library(sna)
 library(ggplot2)
 library(reshape2)
 library(plotrix)
+require(gridExtra)
 ```
 
 <!-- 
@@ -636,6 +637,19 @@ This time, the confusion matrix shows that MST-based clustering is able to achie
 
 \textbf{Theoretical Complexity} Exact solution for K-means has been proved to be NP-Complete @mahajan201213 and no polynomial time algorithm is known. The heuristic algorithm uses the Kruskal algorithm that can be computed in $O(E\log{V})$. The exact solution on medium-size instances is too hard for classical computers and approximate algorithms such as the one presented in this document are the best known methods for solving them.
 
+\textbf{Experimental Complexity} 
+We perform 100 runs of each dataset measure the time of each run.
+```{r fig.cap="\\label{running-time}Running time of each algorithm", warning=FALSE}
+df <- read.csv("./times.csv")
+df1 <- melt(df) %>% dplyr::filter(grepl("blobs", variable))
+df2 <- melt(df) %>% dplyr::filter(grepl("seeds", variable))
+plt1 <- ggplot(data=df1, aes(x=as.factor(df1$variable), y=df1$value)) + geom_boxplot() +
+  xlab("Algorithm") + ylab("Time")
+plt2 <- ggplot(data=df2, aes(x=as.factor(df2$variable), y=df2$value)) + geom_boxplot() +
+  xlab("Algorithm") + ylab("Time")
+grid.arrange(plt1, plt2, ncol=2)
+```
+On \autoref{running-time} we observe that theoretical results are consistent with the running time of each algorithm. Our heuristic algorithm in the worst case runs in milliseconds while the exact solution takes at least 2.5 seconds.
 
 # Conclusions
 
