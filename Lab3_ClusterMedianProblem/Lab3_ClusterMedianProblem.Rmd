@@ -89,7 +89,7 @@ seeds.clean <- seeds[,-c(3, 8)]
 seeds.dist <- as.matrix(dist(seeds.clean))
 write.table(seeds.dist, file='seeds_dist.dat', row.names = FALSE, col.names = FALSE)
 seeds.pca <- princomp(seeds.clean)
-plot(seeds.pca$scores[,1:2])
+plot(seeds.pca$scores[,1:2], col=seeds[,8])
 ```
 
 # Modeling the CMP in AMPL
