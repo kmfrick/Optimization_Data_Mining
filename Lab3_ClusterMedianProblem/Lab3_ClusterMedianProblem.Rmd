@@ -748,6 +748,7 @@ CPLEX 20.1.0.0: optimal integer solution; objective 238.2922866
 We plot the points and color them according to the cluster as given by AMPL, comparing them with the "gold standard" clusters.
 
 ```{r}
+blobs.out <- read.table('blobs_out.dat')
 ip.clusters <- get.ip.clusters(blobs[,3], blobs.out)
 par(mfrow=c(1, 2))
 plot(blobs[, 1:2], col = blobs[,3], xlab="Component 1", ylab="Component 2",
@@ -761,7 +762,6 @@ plot(blobs[, 1:2], col = unlist(ip.clusters), xlab= "Component 1", ylab="Compone
 We read the resulting $X$ matrix and print the confusion matrix.
 
 ```{r}
-blobs.out <- read.table('blobs_out.dat')
 blobs.ampl.cluster.medians <- get.cluster.medians(blobs.out)
 cat("Cluster medians are: ", blobs.ampl.cluster.medians, "\n")
 k <- 4
