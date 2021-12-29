@@ -1,6 +1,6 @@
-param m; # Number of data points
-param n; # Number of features
-param k; # Number of clusters
+param m := 200; # 200 data points in total
+param n := 2; # points on the xy plane
+param k := 4; # 4 clusters
 param d {i in 1..m, j in 1..m};
 var x {i in 1..m, j in 1..m} binary;
 

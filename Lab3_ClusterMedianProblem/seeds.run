@@ -1,0 +1,15 @@
+reset;
+model seeds.mod;
+for {i in 1..m} {
+	for {j in 1..m} {
+		read d[i, j] < seeds_dist.dat;
+	}
+}
+option solver cplex;
+solve;
+for {i in 1..m} {
+	for {j in 1..m} {
+		printf "%d ", x[i, j] > seeds_out.dat;
+	}
+	printf "\n" > seeds_out.dat;
+}

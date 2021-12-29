@@ -1,6 +1,6 @@
-param m; # Number of data points
-param n; # Number of features
-param k; # Number of clusters
+param m := 210; # 70 data points per variety
+param n := 6; # 6 features
+param k := 3; # 3 varieties of wheat
 param d {i in 1..m, j in 1..m};
 var x {i in 1..m, j in 1..m} binary;
 

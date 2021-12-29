@@ -1,15 +1,15 @@
-#!/usr/bin/env ampl
+reset;
 model cluster.mod;
 for {i in 1..m} {
 	for {j in 1..m} {
-		read d[i, j] < seeds_dist.dat;
+		read d[i, j] < dist.dat;
 	}
 }
 option solver cplex;
 solve;
 for {i in 1..m} {
 	for {j in 1..m} {
-		printf "%d ", x[i, j] > seeds_out.dat;
+		printf "%d ", x[i, j] > out.dat;
 	}
-	printf "\n" > seeds_out.dat;
+	printf "\n" > out.dat;
 }
